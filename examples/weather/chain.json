@@ -1,0 +1,37 @@
+{
+  "task_description": "Look up the current weather for a city via an MCP weather server and produce a 2-3 sentence summary.",
+  "steps": [
+    {
+      "number": 1,
+      "title": "fetch_forecast",
+      "step_type": "mcp",
+      "step_config": {
+        "server": {
+          "server_name": "weather",
+          "transport": "stdio",
+          "command": "uvx",
+          "args": ["mcp-weather"]
+        },
+        "tool_name": "get_forecast",
+        "arguments": {
+          "city": "$city",
+          "units": "metric"
+        },
+        "argument_mapping": {
+          "city": "$inputs.city"
+        },
+        "timeout": 30.0
+      }
+    },
+    {
+      "number": 2,
+      "title": "summarise_forecast",
+      "step_type": "llm",
+      "dependencies": [1],
+      "aim": "Render a friendly 2-3 sentence forecast summary, mentioning the temperature, conditions, and any notable weather alerts.",
+      "reasoning_questions": "What temperature range will today see? What conditions should the user prepare for? Is there a noteworthy alert?",
+      "stage_action": "Write the summary as plain English sentences. Avoid technical jargon. Keep it under 60 words.",
+      "example_reasoning": "Pull the high/low + condition string out of forecast_raw; mention any 'alerts' field present."
+    }
+  ]
+}

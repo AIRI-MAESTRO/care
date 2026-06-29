@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Allow other workflows (e.g. mirror.yml) to gate on lint + tests by
+  # calling this workflow as a reusable job.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint + tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          # uv.lock is .gitignored (absent in CI), so the default
+          # `**/uv.lock` cache key matches nothing and setup-uv errors.
+          # Key the cache on pyproject.toml instead.
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Set up Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+
+      - name: Sync dev dependencies
+        # `uv sync` will fail today because mmar-mage + gigaevo-client
+        # aren't on PyPI yet (they're pinned to editable sibling
+        # checkouts in pyproject.toml). Once they publish, this step
+        # resolves them transitively; until then CI runs install in
+        # isolation mode so the lint + offline tests still gate PRs.
+        run: |
+          uv sync --extra dev || \
+            uv pip install --system pytest pytest-asyncio ruff respx
+
+      - name: Run ruff
+        run: uv run ruff check . || ruff check .
+
+      - name: Run pytest
+        # Some test files import upstream `mmar-mage` / `gigaevo-client`
+        # which won't resolve in CI until those publish. Run the
+        # offline-safe slice first; promote to full once upstreams ship.
+        run: |
+          uv run --extra dev pytest tests/test_packaging.py \
+            tests/test_screen_save_report.py \
+            -q --maxfail=1 || \
+          pytest tests/test_packaging.py \
+            tests/test_screen_save_report.py \
+            -q --maxfail=1

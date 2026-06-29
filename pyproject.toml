@@ -1,0 +1,160 @@
+# PyPI distribution name. The plain `care` name is owned by an unrelated
+# project, so we publish as `maestro-care`; the import package stays `care`
+# (see [tool.hatch.build.targets.wheel]). The public CLI command is `maestro`,
+# with a `care` alias kept for back-compat (see [project.scripts]).
+[project]
+name = "maestro-care"
+version = "0.1.9"
+description = "Collaborative Agent Reasoning Ecosystem — Textual TUI demo"
+readme = "README.md"
+requires-python = ">=3.12"
+keywords = [
+    "tui",
+    "textual",
+    "agents",
+    "llm",
+    "evolution",
+    "care",
+    "carl",
+    "mage",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Terminals",
+]
+# Required deps: everything CARE imports unconditionally at top level.
+# `mmar-mage` is required because the TUI's Generate flow (the
+# primary surface in ChatScreen / QueryScreen) drives MAGE
+# end-to-end; lazy-importing it would let installs silently boot
+# into a non-functional state. Other upstreams (mmar-carl,
+# openai, anthropic, docker, e2b) stay opt-in below.
+dependencies = [
+    "textual>=8.2.6",
+    "pydantic>=2.11",
+    "httpx>=0.27",
+    "gigaevo-client>=0.3.0",
+    "mmar-mage>=0.1.2",
+    "pypdf>=4.0",
+    "rich-pixels>=3.0",
+    # Textual-native plot widget for the EvolutionScreen's Fitness tab —
+    # high-resolution braille rendering of fitness vs generation. Chosen
+    # over plotext because PlotWidget docks into Textual's layout and
+    # repaints incrementally on data updates without a full screen redraw.
+    "textual-plot>=0.4.0",
+    # Deterministic .pptx fallback: when a file-producing skill returns no file
+    # (a weak model couldn't drive the sandbox tools), CARE builds the deck
+    # itself from the generated slide text. See care/runtime/deck_builder.py.
+    "python-pptx>=0.6.21",
+    # Keyless DuckDuckGo backend for the bundled web_search tool — the
+    # universal fallback so search works with zero API-key config. Small,
+    # pure-Python. See care/builtin_tools.py:_search_duckduckgo.
+    "ddgs>=9.0",
+    # Office / rich-text document text-extraction for @-file refs in the chat
+    # surface — Word (.docx), Excel (.xlsx), OpenDocument (.odt/.odp/.ods) and
+    # RTF. (PowerPoint reuses python-pptx above; PDF reuses pypdf.) Small,
+    # pure-Python libs kept *required* so "any document just works" out of the
+    # box, matching the built-in PDF path. See care/runtime/document_extract.py.
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "odfpy>=1.4",
+    "striprtf>=0.0.26",
+]
+
+[project.urls]
+Homepage = "https://github.com/AIRI-Institute/care"
+Repository = "https://github.com/AIRI-Institute/care"
+Issues = "https://github.com/AIRI-Institute/care/issues"
+
+[project.optional-dependencies]
+# Execution: required when CARE actually executes chains through the
+# runtime executor / preflight against a real `ReasoningChain`.
+carl = ["mmar-carl>=0.2"]
+# LLM clients: install whichever provider the user selected in
+# `MageConfig.provider`. The factory in `care/runtime/llm_client.py`
+# raises `LLMClientError` with an install hint when the chosen
+# provider's SDK isn't installed.
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.20"]
+# Sandbox backends: pick whichever matches the host. CARE ships a pure-
+# stdlib `LocalSandboxBackend` (no extras needed) plus optional
+# Docker / E2B / Firejail backends.
+docker = ["docker>=7.0"]
+e2b = ["e2b>=0.17"]
+# Plot rendering for the EvolutionScreen fitness pane. Pure-
+# Python (no native deps); the screen falls back to a
+# unicode-block sparkline when this extra isn't installed.
+plots = ["plotext>=5.2"]
+# Production deploy: the agent hub (`carl-agent-hub` CLI) that `/deploy`
+# autostarts to serve chains as HTTP agents. Separate package so the base
+# install stays light; `pip install "maestro-care[deploy]"` puts the hub on
+# PATH for the production-mode flow.
+deploy = ["carl-agent-server>=0.1.0"]
+# Aggregate convenience: `pip install "care[full]"` pulls every
+# optional upstream + every backend. (mmar-mage already required.)
+full = [
+    "mmar-carl>=0.2",
+    "openai>=1.0",
+    "anthropic>=0.20",
+    "docker>=7.0",
+    "e2b>=0.17",
+    "plotext>=5.2",
+    "carl-agent-server>=0.1.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "respx>=0.21",
+]
+
+[project.scripts]
+maestro = "care.cli:main"
+care = "care.cli:main"  # back-compat alias
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["care"]
+# Defensive: hatchling's `packages = ["care"]` ships every file
+# under `care/` by default (including non-`.py`), but pin the
+# globs here so a future config refactor can't accidentally
+# orphan the logos / stylesheet that the TUI loads at boot.
+include = [
+    "care/**/*.py",
+    "care/assets/*.png",
+    "care/styles/*.tcss",
+    "care/runtime/locales/*.json",
+]
+# Note: uv.lock is intentionally NOT bundled. It's .gitignored (absent in CI),
+# can't be regenerated on a clean runner (the editable [tool.uv.sources] point
+# at sibling checkouts that don't exist there), and pins local path deps that
+# are meaningless to a PyPI consumer. Bundling it broke `python -m build`.
+
+[tool.hatch.build.targets.sdist]
+# Mirror the wheel includes + carry the dev surfaces the
+# user / CI rebuild against (tests, README, dotenv example).
+include = [
+    "care/",
+    "tests/",
+    "README.md",
+    ".env.example",
+    "Makefile",
+    "TODO.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

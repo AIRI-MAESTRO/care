@@ -1,0 +1,61 @@
+{
+  "task_description": "Extract a quarterly financial statement from a PDF, normalise the headline figures into a structured object, and persist the result as a memory_card so future runs can compare quarters.",
+  "steps": [
+    {
+      "number": 1,
+      "title": "extract_pdf_text",
+      "step_type": "tool",
+      "step_config": {
+        "tool_name": "pdf_extractor",
+        "tool_description": "Reads the source PDF and returns plain text + parsed tables. Wraps the `pdf-extractor` SKILL (or its placeholder Python tool) until CARL upstream ships the `agent_skill` step type.",
+        "input_mapping": {
+          "pdf_path": "$inputs.pdf_path"
+        },
+        "output_key": "extracted"
+      }
+    },
+    {
+      "number": 2,
+      "title": "normalise_financials",
+      "step_type": "structured_output",
+      "dependencies": [1],
+      "step_config": {
+        "input_source": "$history[-1]",
+        "output_schema": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "type": "string",
+              "description": "Reporting period, e.g. 'Q3 2025'."
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO 4217 code, e.g. 'USD'."
+            },
+            "revenue": {
+              "type": "number",
+              "description": "Top-line revenue."
+            },
+            "net_income": {
+              "type": "number",
+              "description": "Bottom-line net income."
+            },
+            "total_expenses": {
+              "type": "number",
+              "description": "Total operating expenses."
+            },
+            "notable_alerts": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Risk callouts (going-concern, restatements, audit notes)."
+            }
+          },
+          "required": ["period", "currency", "revenue", "net_income", "total_expenses"]
+        },
+        "schema_name": "QuarterlyFinancials",
+        "instruction": "Parse the extracted PDF text into the QuarterlyFinancials shape. Numbers should be raw values in `currency` units (not thousands). If a field can't be confidently extracted, omit it rather than guessing.",
+        "strict_json": true
+      }
+    }
+  ]
+}

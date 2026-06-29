@@ -1,0 +1,25 @@
+/* CARE demo screen — task setup + pipeline preview */
+
+Screen {
+    background: $background;
+}
+
+#main-row {
+    height: 1fr;
+}
+
+#main-row > TaskSetup {
+    width: 1fr;
+}
+
+#main-row > PipelinePreview {
+    width: 1fr;
+}
+
+Header {
+    background: $primary 20%;
+}
+
+Footer {
+    background: $primary 30%;
+}

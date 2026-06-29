@@ -1,0 +1,16 @@
+# MCP server configuration for the weather example.
+#
+# CARE picks up this file with `care.build_catalog(mcp_config_path=...)`.
+# Once dropped at `~/.config/care/mcp_servers.toml` (or referenced
+# via `--mcp-config` on `care catalog`), the `weather` server
+# becomes available for any chain that names it.
+#
+# `mcp-weather` is a placeholder; swap in whichever MCP weather
+# server your environment ships (anthropic-mcp-weather,
+# mcp-weather-uvx, an in-house one, etc.).
+
+[servers.weather]
+command = "uvx"
+args = ["mcp-weather"]
+description = "MCP server exposing forecast + alert tools."
+tags = ["weather", "external"]

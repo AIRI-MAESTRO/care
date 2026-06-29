@@ -1,0 +1,29 @@
+{
+  "task_description": "Demo chain for the CARE asciicast — extract weather from an MCP server and summarise it.",
+  "steps": [
+    {
+      "number": 1,
+      "title": "fetch_forecast",
+      "step_type": "mcp",
+      "step_config": {
+        "server": {
+          "server_name": "weather",
+          "transport": "stdio",
+          "command": "uvx",
+          "args": ["mcp-weather"]
+        },
+        "tool_name": "get_forecast",
+        "arguments": {"city": "$city"},
+        "timeout": 15.0
+      }
+    },
+    {
+      "number": 2,
+      "title": "summarise",
+      "step_type": "llm",
+      "dependencies": [1],
+      "aim": "Render a 2-3 sentence forecast in plain English.",
+      "stage_action": "Avoid jargon; mention temperature + conditions + any alerts."
+    }
+  ]
+}

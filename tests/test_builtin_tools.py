@@ -1,0 +1,428 @@
+"""Tests for the bundled standard tools and their wiring.
+
+Covers:
+* the pure tools (``calculator`` / ``current_datetime`` / HTML→text),
+* ``web_search`` formatting + graceful no-key / provider-error paths,
+* ``register_builtin_tools`` activation onto a stub context,
+* ``builtin_tool_specs`` discovery shape, and
+* ``executor._apply_default_tools`` registering builtins from config.
+"""
+
+from __future__ import annotations
+
+import asyncio
+
+import httpx
+import pytest
+import respx
+
+from care import builtin_tools
+from care.config import CareConfig
+
+
+class _StubCtx:
+    """Minimal stand-in for CARL's ReasoningContext tool registry."""
+
+    def __init__(self) -> None:
+        self.registered: dict[str, object] = {}
+        self.tags: dict[str, set[str]] = {}
+
+    def register_tool(self, name, fn, *, timeout=None, tags=None):  # noqa: ANN001
+        self.registered[name] = fn
+        self.tags[name] = set(tags or [])
+
+
+# ---------------------------------------------------------------------------
+# Pure tools
+# ---------------------------------------------------------------------------
+
+
+def test_calculator_evaluates():
+    assert builtin_tools.calculator("2 * (3 + 4)") == "14"
+
+
+def test_calculator_empty_is_friendly():
+    assert "empty expression" in builtin_tools.calculator("   ")
+
+
+def test_calculator_error_does_not_raise():
+    out = builtin_tools.calculator("1 / 0")
+    assert "calculator error" in out
+
+
+def test_current_datetime_is_iso_utc():
+    out = builtin_tools.current_datetime()
+    assert "T" in out and "+00:00" in out and "(" in out  # ISO + weekday/long-date
+
+
+def test_html_to_text_strips_tags_and_scripts():
+    html = (
+        "<html><head><style>.x{}</style></head>"
+        "<body><script>evil()</script><p>Hello&nbsp;<b>world</b></p></body></html>"
+    )
+    text = builtin_tools._html_to_text(html)
+    assert "Hello" in text and "world" in text
+    assert "evil" not in text and "<p>" not in text
+
+
+# ---------------------------------------------------------------------------
+# web_search
+# ---------------------------------------------------------------------------
+
+
+def test_bias_recency():
+    from datetime import datetime, timezone
+
+    yr = datetime.now(timezone.utc).year
+    # recency intent (EN + RU) → current year appended
+    assert str(yr) in builtin_tools._bias_recency("latest Imagine Dragons track")
+    assert str(yr) in builtin_tools._bias_recency("последний трек Imagine Dragons")
+    # a stale year gets rewritten to the current one (not duplicated)
+    assert builtin_tools._bias_recency("Imagine Dragons latest 2021") == f"Imagine Dragons latest {yr}"
+    # non-temporal query left untouched
+    assert builtin_tools._bias_recency("history of the Roman empire") == "history of the Roman empire"
+
+
+def test_web_search_no_key_falls_back_to_duckduckgo(monkeypatch):
+    """No API key → keyless DuckDuckGo fallback so search works out of the
+    box (previously returned a 'not configured' line)."""
+    seen: dict[str, str] = {}
+
+    async def fake_search(provider, api_key, query, max_results):  # noqa: ANN001
+        seen["provider"] = provider
+        return None, [{"title": "DDG", "url": "https://d.dg", "content": "ok"}]
+
+    monkeypatch.setattr(builtin_tools, "_search", fake_search)
+    ws = builtin_tools._make_web_search("tavily", None, 5)
+    out = asyncio.run(ws("weather in Moscow"))
+    assert seen["provider"] == "duckduckgo"  # downgraded to the keyless engine
+    assert "[1] DDG" in out
+
+
+def test_web_search_empty_query():
+    ws = builtin_tools._make_web_search("tavily", "key", 5)
+    assert "empty query" in asyncio.run(ws("  "))
+
+
+def test_web_search_formats_results(monkeypatch):
+    async def fake_search(provider, api_key, query, max_results):  # noqa: ANN001
+        assert provider == "tavily" and api_key == "key"
+        return ("Moscow is +18°C and clear.", [
+            {"title": "Moscow weather", "url": "https://ex.com", "content": "+18°C"},
+            {"title": "Forecast", "url": "https://ex.org", "content": "rain"},
+        ])
+
+    monkeypatch.setattr(builtin_tools, "_search", fake_search)
+    ws = builtin_tools._make_web_search("tavily", "key", 5)
+    out = asyncio.run(ws("Moscow weather"))
+    assert "Answer: Moscow is +18°C and clear." in out  # provider answer leads
+    assert "[1] Moscow weather" in out
+    assert "https://ex.com" in out
+    assert "[2] Forecast" in out
+
+
+def test_web_search_provider_error_is_graceful(monkeypatch):
+    async def boom(*a, **k):  # noqa: ANN001, ANN002, ANN003
+        raise RuntimeError("429 rate limited")
+
+    monkeypatch.setattr(builtin_tools, "_search", boom)
+    ws = builtin_tools._make_web_search("tavily", "key", 5)
+    out = asyncio.run(ws("x"))
+    assert "web_search error" in out and "429" in out
+
+
+def test_web_search_dedupes_urls(monkeypatch):
+    """Repeated URLs (e.g. across fallback engines) collapse to one entry."""
+
+    async def fake(provider, api_key, query, max_results):  # noqa: ANN001
+        return None, [
+            {"title": "A", "url": "https://x", "content": "1"},
+            {"title": "B", "url": "https://x", "content": "2"},  # dup URL
+            {"title": "C", "url": "https://y", "content": "3"},
+        ]
+
+    monkeypatch.setattr(builtin_tools, "_search", fake)
+    ws = builtin_tools._make_web_search("tavily", "k", 5)
+    out = asyncio.run(ws("q"))
+    assert "[1] A" in out and "[2] C" in out and "[3]" not in out
+
+
+async def _no_sleep(_seconds):  # noqa: ANN001 — injected backoff stub
+    return None
+
+
+def test_search_resilient_retries_transient_then_succeeds(monkeypatch):
+    """A transient 429 is retried (with injected no-op backoff) and the
+    second attempt's result is returned."""
+    calls = {"n": 0}
+
+    async def flaky(provider, api_key, query, max_results):  # noqa: ANN001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.HTTPStatusError(
+                "429",
+                request=httpx.Request("POST", "https://x"),
+                response=httpx.Response(429),
+            )
+        return "ans", [{"title": "T", "url": "u", "content": "c"}]
+
+    monkeypatch.setattr(builtin_tools, "_search", flaky)
+    answer, results = asyncio.run(
+        builtin_tools._search_resilient("tavily", "k", "q", 3, sleep=_no_sleep)
+    )
+    assert calls["n"] == 2 and answer == "ans" and results
+
+
+def test_search_resilient_falls_back_to_duckduckgo(monkeypatch):
+    """A non-transient primary failure falls through to keyless DuckDuckGo."""
+
+    async def fake(provider, api_key, query, max_results):  # noqa: ANN001
+        if provider == "tavily":
+            raise RuntimeError("boom")  # non-transient → next provider
+        if provider == "duckduckgo":
+            return None, [{"title": "DDG", "url": "https://d", "content": "ok"}]
+        return None, []
+
+    monkeypatch.setattr(builtin_tools, "_search", fake)
+    answer, results = asyncio.run(
+        builtin_tools._search_resilient("tavily", "k", "q", 3, sleep=_no_sleep)
+    )
+    assert results and results[0]["title"] == "DDG"
+
+
+@respx.mock
+def test_search_tavily_400_downgrades_to_basic():
+    """Tavily 400 on advanced search retries once with basic depth."""
+    route = respx.post("https://api.tavily.com/search").mock(
+        side_effect=[
+            httpx.Response(400, json={"detail": "bad request"}),
+            httpx.Response(
+                200,
+                json={
+                    "answer": "ok",
+                    "results": [{"title": "T", "url": "u", "content": "c"}],
+                },
+            ),
+        ]
+    )
+    answer, results = asyncio.run(builtin_tools._search("tavily", "k", "q", 3))
+    assert answer == "ok" and results[0]["url"] == "u"
+    assert route.call_count == 2  # advanced 400 → basic retry
+
+
+@respx.mock
+def test_search_serper_maps_results():
+    respx.post("https://google.serper.dev/search").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "answerBox": {"answer": "42"},
+                "organic": [{"title": "T", "link": "https://x", "snippet": "s"}],
+            },
+        )
+    )
+    answer, results = asyncio.run(builtin_tools._search("serper", "k", "q", 3))
+    assert answer == "42"
+    assert results[0]["url"] == "https://x" and results[0]["content"] == "s"
+
+
+@respx.mock
+def test_search_exa_maps_results():
+    respx.post("https://api.exa.ai/search").mock(
+        return_value=httpx.Response(
+            200,
+            json={"results": [{"title": "T", "url": "https://e", "text": "body"}]},
+        )
+    )
+    answer, results = asyncio.run(builtin_tools._search("exa", "k", "q", 3))
+    assert answer is None
+    assert results[0]["url"] == "https://e" and results[0]["content"] == "body"
+
+
+# ---------------------------------------------------------------------------
+# fetch_url
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_url_empty():
+    fu = builtin_tools._make_fetch_url(4000)
+    assert "empty url" in asyncio.run(fu(""))
+
+
+# ---------------------------------------------------------------------------
+# http_request
+# ---------------------------------------------------------------------------
+
+
+def test_http_request_empty_url():
+    hr = builtin_tools._make_http_request(4000)
+    assert "empty url" in asyncio.run(hr(""))
+
+
+def test_coerce_mapping():
+    assert builtin_tools._coerce_mapping('{"a": 1}') == {"a": 1}
+    assert builtin_tools._coerce_mapping({"b": 2}) == {"b": 2}
+    assert builtin_tools._coerce_mapping("not json") is None
+    assert builtin_tools._coerce_mapping(None) is None
+
+
+def test_http_request_success(monkeypatch):
+    import httpx
+
+    class _Resp:
+        status_code = 201
+        text = '{"ok": true}'
+        headers = {"content-type": "application/json"}
+
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, verb, url, **kw):  # noqa: ANN001
+            assert verb == "POST" and url == "https://api.example.com/x"
+            assert kw.get("json") == {"q": 1}
+            return _Resp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    hr = builtin_tools._make_http_request(4000)
+    out = asyncio.run(hr("api.example.com/x", method="post", json_body='{"q": 1}'))
+    assert "HTTP 201 POST" in out
+    assert "https://api.example.com/x" in out
+    assert '{"ok": true}' in out
+
+
+# ---------------------------------------------------------------------------
+# run_python (sandboxed)
+# ---------------------------------------------------------------------------
+
+
+def test_run_python_empty():
+    rp = builtin_tools._make_run_python(CareConfig().sandbox, 30, 4000)
+    assert "empty code" in asyncio.run(rp("   "))
+
+
+def test_run_python_requires_docker_kind():
+    cfg = CareConfig()
+    cfg.sandbox.kind = "local"
+    rp = builtin_tools._make_run_python(cfg.sandbox, 30, 4000)
+    out = asyncio.run(rp("print(1)"))
+    assert "Docker" in out and "CARE_SANDBOX__KIND=docker" in out
+
+
+def test_run_python_missing_docker_cli(monkeypatch):
+    import shutil
+
+    monkeypatch.setattr(shutil, "which", lambda *_: None)
+    rp = builtin_tools._make_run_python(CareConfig().sandbox, 30, 4000)
+    out = asyncio.run(rp("print(1)")).lower()
+    assert "docker" in out and "path" in out
+
+
+# ---------------------------------------------------------------------------
+# Activation + discovery
+# ---------------------------------------------------------------------------
+
+
+_EXPECTED = {
+    "web_search",
+    "fetch_url",
+    "http_request",
+    "calculator",
+    "current_datetime",
+    "run_python",
+}
+
+
+def test_register_builtin_tools_registers_expected_names():
+    ctx = _StubCtx()
+    names = builtin_tools.register_builtin_tools(ctx, CareConfig().tools)
+    assert set(names) == _EXPECTED
+    assert set(ctx.registered) == set(names)
+    # web tools carry the 'web' tag for tag-restricted steps.
+    assert "web" in ctx.tags["web_search"]
+
+
+def test_register_respects_disable_code_exec():
+    cfg = CareConfig()
+    cfg.tools.enable_code_exec = False
+    ctx = _StubCtx()
+    names = builtin_tools.register_builtin_tools(ctx, cfg.tools, cfg.sandbox)
+    assert "run_python" not in names
+    assert "http_request" in names  # http stays — only code-exec gated
+
+
+def test_register_builtin_tools_skips_context_without_register_tool():
+    # Duck-typed guard: a stripped context shouldn't explode the run.
+    assert builtin_tools.register_builtin_tools(object(), CareConfig().tools) == []
+
+
+def test_builtin_tool_specs_shape():
+    specs = builtin_tools.builtin_tool_specs()
+    by_name = {s["name"]: s for s in specs}
+    assert _EXPECTED <= set(by_name)
+    for spec in specs:
+        assert spec["source"] == "care:builtin"
+        assert spec["description"] and isinstance(spec["tags"], list)
+    # The signature is baked into the description so MAGE maps inputs.
+    assert "query" in by_name["web_search"]["description"]
+    assert "run_python(code" in by_name["run_python"]["description"]
+
+
+def test_specs_exclude_run_python_when_disabled():
+    cfg = CareConfig()
+    cfg.tools.enable_code_exec = False
+    names = {s["name"] for s in builtin_tools.builtin_tool_specs(cfg.tools)}
+    assert "run_python" not in names
+    assert "http_request" in names
+
+
+# ---------------------------------------------------------------------------
+# Executor wiring
+# ---------------------------------------------------------------------------
+
+
+def test_apply_default_tools_registers_builtins():
+    from care.runtime import executor
+
+    ctx = _StubCtx()
+    executor._apply_default_tools(ctx, CareConfig())
+    assert {"web_search", "calculator"} <= set(ctx.registered)
+
+
+def test_apply_default_tools_none_config_is_noop():
+    from care.runtime import executor
+
+    ctx = _StubCtx()
+    executor._apply_default_tools(ctx, None)
+    assert ctx.registered == {}
+
+
+def test_apply_default_tools_respects_disable_flag():
+    from care.runtime import executor
+
+    cfg = CareConfig()
+    cfg.tools.enable_builtins = False
+    ctx = _StubCtx()
+    executor._apply_default_tools(ctx, cfg)
+    assert "web_search" not in ctx.registered
+
+
+def test_disabled_builtins_not_advertised_to_mage(tmp_path):
+    from care.capability_priming import build_capabilities_for_generation
+
+    cfg = CareConfig()
+    cfg.tools.enable_builtins = False
+    # Empty cache dir so previously-synthesised tools don't get advertised.
+    cfg.tools.synthesized_tools_path = tmp_path / "empty"
+    # No builtins + no cached tools → nothing to prime.
+    assert build_capabilities_for_generation(cfg) is None
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(pytest.main([__file__, "-v"]))

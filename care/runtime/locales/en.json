@@ -1,0 +1,1324 @@
+{
+  "app": {
+    "toast": {
+      "openChatToRevise": "Open the chat to revise a chain.",
+      "generationComplete": "Generation complete",
+      "openChatFailed": "Couldn't open chat: {error}",
+      "runUnavailable": "Run unavailable: {error}",
+      "runFailed": "Run failed: {error}"
+    }
+  },
+  "chat": {
+    "welcome": "MAESTRO builds agent chains for your tasks — not a slow search, but a reproducible pipeline of linked steps. Describe a task to get started. Jump to /artifacts (chains from this chat), /library (saved chains), /evolution (evolve a chain) or /settings. Type /help for all commands.",
+    "artifactPill": {
+      "label": "Artifacts",
+      "unsaved": "Artifacts ({n} unsaved)",
+      "saved": "Artifacts ({n} saved)"
+    },
+    "tooltip": {
+      "adHoc": "Agent chain generation: I design a chain of linked steps for your task. By default I ask before running (run-immediately in /settings). Save, edit (/revise), or reuse the chain only when you decide. Works without Memory configured.",
+      "production": "Agent creation: I build a reproducible agent, save it to Memory under a stable chain_id, seed a baseline run for quality tracking, and (when Platform is wired) kick off evolution. Needs CARE_MEMORY__BASE_URL (and CARE_MEMORY__API_KEY when auth is enabled) — otherwise it falls back to Chat with a warning."
+    },
+    "welcomeTail": {
+      "agent": "Agent-creation mode — I'll build a reproducible agent, save it to Memory under a stable chain_id, and seed a baseline run. Evolution (when Platform is wired) starts automatically. The agent ID is printed once it's built so you can reference it later. Back to quick answers: /mode chat.",
+      "chat": "You're in agent chain generation mode — I quickly build a chain of linked steps for your task. When the chain is ready, you can run it and review the result, save it to the library, or edit individual steps. Attach a file with @notes.md — its contents are embedded in the task. To re-run a saved chain: /library → Run. Type your task and press Enter. Saved chains can be evolved when labeled data is available — see «More about evolution» or «Working with data» below."
+    },
+    "flipHint": {
+      "agent": "Now in Agent-creation mode — built agents are saved to Memory under a stable chain_id, a baseline run is recorded for quality tracking, and (when Platform is wired) evolution kicks off.",
+      "chat": "Now in agent chain generation mode — I build a chain of steps for your task; by default I ask before running (run-immediately in /settings). Save or edit with the Save button and /revise."
+    },
+    "badge": {
+      "agent": "AGENT",
+      "chat": "CHAT"
+    },
+    "mode": {
+      "chat": "Agent chain generation for your task",
+      "agent": "Agent creation",
+      "libraryQuick": "My chains library",
+      "libraryQuickShort": "Library",
+      "libraryQuickTip": "Open your saved chains library (same as /library)",
+      "evolutionQuick": "More about evolution",
+      "evolutionQuickShort": "Evolution",
+      "evolutionQuickTip": "Short guide: what evolution is and how to launch it",
+      "dataQuick": "Working with data",
+      "dataQuickShort": "Data",
+      "dataQuickTip": "How to attach files (@), re-run chains, and build datasets",
+      "skillStub": "Add as a coding-agent skill",
+      "skillStubShort": "Skill",
+      "skillStubTip": "Coming soon — export this chain as a coding-agent skill",
+      "skillStubToast": "Not available yet — this feature is in development.",
+      "current": "Current mode: {label} ({mode}).",
+      "unknown": "Unknown mode {arg!r}. Try /mode chat or /mode agent.",
+      "already": "Already in {label} mode."
+    },
+    "inputPlaceholder": "Describe a task, @path/to/file, or /help…",
+    "inputHints": {
+      "segments": {
+        "enter": "Enter — send",
+        "atFile": "@file — attach",
+        "library": "/library — library",
+        "dataset": "/dataset add — eval cases",
+        "esc": "Esc — cancel"
+      },
+      "atRef": "@ — pick a file · Tab — insert · PDF/docx"
+    },
+    "updateAvailable": "⬆ CARE {latest} is available — run maestro-install to update",
+    "fileRef": {
+      "attached": "⎿ attached {path} ({size})"
+    },
+    "skillFiles": {
+      "needed": "This chain reads a document — pick the file to run it on (Esc to cancel).",
+      "cancelled": "No file picked — run cancelled.",
+      "extractFailed": "Couldn't read {path} — run cancelled.",
+      "attached": "⎿ using document: {name}"
+    },
+    "searchPlaceholder": "Find in transcript…",
+    "spinner": "thinking…",
+    "stopTooltip": "Cancel the in-flight generation / dataset / evolution / forget worker. Same effect as Esc.",
+    "settingsUpdated": "Settings were updated!",
+    "settingsSaved": "Settings saved — no changes.",
+    "transcriptCleared": "Transcript cleared.",
+    "newConversation": "Started a new conversation — earlier turns won't be fed to the agent chain generator anymore.",
+    "noContextToClear": "No conversation context to clear.",
+    "productionFallback": "Production mode needs Memory configured — falling back to Interactive. Set CARE_MEMORY__API_KEY (or point CARE_MEMORY__BASE_URL at your deployment), then re-launch.",
+    "prod": {
+      "artifacts": "Artifacts",
+      "artifactsTip": "Open /artifacts to review + save chains",
+      "dataset": "Run on dataset",
+      "datasetTip": "Score the most recent chain on its saved dataset",
+      "evolve": "Evolve",
+      "evolveTip": "Open evolution for the most recent chain"
+    },
+    "tour": {
+      "step1": "Tour 1/5 — Welcome to MAESTRO.\nMAESTRO is a chat-first agent ecosystem: describe a task, MAESTRO generates a reasoning chain, runs it, and shows the result inline. Press Enter to continue, Esc to exit.",
+      "step2": "Tour 2/5 — Interactive mode.\nYou're in Interactive right now. Type any task — `summarise the README` or `find every TODO in src/` — and MAESTRO generates a chain, then (by default) asks before running it. The chain is disposable; save it with the Save button if you want to keep it. Switch to run-immediately in /settings.",
+      "step3": "Tour 3/5 — Production mode.\nSwitch with /mode production. Each task becomes a reproducible chain saved to Memory under a stable chain_id, with a baseline dataset entry seeded for quality tracking. Use this when you're building a real agent, not just exploring.",
+      "step4": "Tour 4/5 — Library and datasets.\n/library lists saved chains — highlight a row and press Run to execute with new inputs. /run <chain_id> opens read-only chain details. /dataset list / add / run / export manage evaluation data for quality tracking.",
+      "step5": "Tour 5/5 — Evolution.\n/evolution <run_id> shows live status of an evolution run; /evolution watch <run_id> streams events as they happen. That's the tour — press Enter to finish, then type a task to begin or /help for the full command list.",
+      "offer": "First time here? Type /tour for a 5-step walkthrough.",
+      "complete": "Tour complete. Type any task to begin, or /help for the full command list.",
+      "exited": "Tour exited. Type /tour to start over.",
+      "busy": "Can't start the tour while generation is in flight — press Esc first."
+    },
+    "productionTutorial": "First-time Production tutorial — here's what happens on your next message:\n  1. The agent chain generator produces a reproducible chain for the task.\n  2. The chain is saved to Memory under a stable `chain_id` — copy it with Ctrl+Y / inspect with /run <id>.\n  3. MAESTRO runs the chain once on the same task and seeds the first dataset entry (the baseline) so quality is measurable from day one.\n  4. If Platform is wired, evolution kicks off automatically; otherwise the step is logged as \"Evolution skipped — Platform not configured.\"\nUse /dataset list <chain_id> to view your dataset, /dataset run to score it, /evolution <run_id> for live evolution state. /help shows everything Production mode exposes.\n\nFollow-ups: once a chain is saved, your next plain messages are treated as revision instructions against that chain (e.g. \"add structured output in the final step\"). The agent chain generator plans a minimal edit, previews the diff, and on confirm saves a new version under the same id. Use /new to drop the revision target and start a fresh chain instead.",
+    "stage": {
+      "domainAnalysis": "Analysing domain",
+      "capabilityLookup": "Capability lookup",
+      "memoryResearch": "Researching memory",
+      "topologySelection": "Topology selection",
+      "planningSteps": "Planning steps",
+      "buildingDag": "Building DAG",
+      "describingSteps": "Describing steps",
+      "critique": "Critiquing the plan",
+      "verification": "Verifying the chain",
+      "refine": "Refining the chain",
+      "synthesising": "Synthesising answer",
+      "working": "Working",
+      "chainFinished": "Work on this chain is complete — describe a new task in the prompt to continue.",
+      "runDeclined": "Run skipped — the chain was generated but not executed.",
+      "confirmRun": "Run",
+      "confirmSave": "Save",
+      "confirmEdit": "Edit chain",
+      "cancelRun": "Finish",
+      "confirm": {
+        "run": "Run the generated chain now?",
+        "runGuide": "Chain ready — what next?\n• Run now — Run\n• Save to library — Save\n• Edit steps — Edit\n• New task without running — Skip",
+        "save": "Save this chain to your library?",
+        "baseline": "Record a baseline run for this chain?",
+        "evolve": "Kick off evolution for this chain?"
+      },
+      "label": {
+        "generate": "Generate",
+        "preview": "Preview",
+        "run": "Run",
+        "save": "Save",
+        "baseline": "Baseline",
+        "evolve": "Evolve"
+      },
+      "skipReason": {
+        "declined": "declined",
+        "skipped": "skipped",
+        "needs run": "needs a successful run",
+        "needs save": "needs a successful save",
+        "needs baseline": "needs a baseline"
+      }
+    },
+    "chainBar": {
+      "view": "View chain",
+      "save": "Save",
+      "edit": "Edit chain",
+      "evolve": "Evolve",
+      "run": "Run",
+      "finish": "Finish",
+      "titleRevised": "Chain updated",
+      "titleUpdated": "Chain changed",
+      "titleVersion": "Version {n} selected",
+      "titleWithVersion": "{name} · v{n}",
+      "titleGenerated": "Chain generated",
+      "titleAction": "Choose your next step:",
+      "versionLabel": "v{n}",
+      "versionOption": "v{n} · {name}",
+      "versionSelectLabel": "Version:",
+      "versionDiffHeader": "Changes v{from_n} → v{to_n}:",
+      "versionPatchHeader": "JSON patch between versions:",
+      "viewHint": "View — open the chain diagram and step list",
+      "saveHint": "Save — store the chain in your library",
+      "runHint": "Run — execute the chain on the current task",
+      "editHint": "Edit — change a step or the chain description",
+      "evolveHint": "Evolve — improve the chain via evolution",
+      "finishHint": "Finish — stop working with this chain",
+      "versionSelectHint": "Version — switch a saved revision; a diff appears below",
+      "runBusy": "Please wait — generation or a run is already in progress.",
+      "noTask": "No task to run against — send your request again or use /new.",
+      "noChain": "No chain available to run.",
+      "versionsNeedsSave": "Versions are available only for a saved chain — Save first.",
+      "versionLoadFailed": "Couldn't load the selected version.",
+      "versionSwitched": "Loaded version v{n} — you can run or edit it."
+    },
+    "saveName": {
+      "title": "Save to library",
+      "hint": "Enter a name for this chain — it will appear in My chains.",
+      "placeholder": "Chain name",
+      "confirm": "Save"
+    },
+    "trace": {
+      "generationStarted": "Generation started.",
+      "generationComplete": "Generation complete.",
+      "chainGenerated": "Chain generated successfully!",
+      "readFull": "View chain",
+      "executingChain": "Executing chain…",
+      "chainReady": "Chain ready",
+      "inTime": " in {secs}s",
+      "modeLabel": "{mode} mode",
+      "domain": "domain: {domain}",
+      "coldStart": "cold start",
+      "stepsDone": "{done}/{total} {unit} done",
+      "stepPrefix": "step",
+      "stepTitle": "Step {num}: {label}",
+      "toolTitle": "Tool: {label}",
+      "step": {
+        "one": "step",
+        "few": "steps",
+        "many": "steps"
+      },
+      "memoryHit": {
+        "one": "memory hit",
+        "few": "memory hits",
+        "many": "memory hits"
+      },
+      "webResult": {
+        "one": "web result",
+        "few": "web results",
+        "many": "web results"
+      },
+      "event": {
+        "one": "event",
+        "few": "events",
+        "many": "events"
+      }
+    },
+    "dag": {
+      "title": "Chain DAG — {name}",
+      "noSteps": "(no steps)",
+      "nothingToShow": "(nothing to show)",
+      "stepCount": "({count} steps)",
+      "evolve": "Evolve this chain",
+      "editStep": "Edit step",
+      "mermaidCopied": "Copied Mermaid diagram to the clipboard.",
+      "copyFailed": "Couldn't reach the clipboard.",
+      "save": "Save to library",
+      "saving": "Saving…",
+      "saved": "Saved to library",
+      "close": "Close",
+      "defaultName": "chain",
+      "untitled": "Untitled chain",
+      "savingBeforeEvolve": "Saving chain to Memory before evolving…",
+      "savingToLibrary": "Saving chain to your library…",
+      "alreadySaved": "This chain is already in your library as `{id}`.",
+      "memoryNotWired": "Can't evolve — Memory facade isn't wired, so the chain can't be saved first.",
+      "saveMemoryNotWired": "Can't save — Memory isn't wired. Set CARE_MEMORY__BASE_URL and re-launch.",
+      "saveFailed": "Couldn't save the chain to Memory: {error}",
+      "savedAs": "✓ Saved chain `{id}` to Memory as “{name}”."
+    },
+    "evolution": {
+      "skipped": "Evolution skipped — Platform not configured.",
+      "startFailed": "Couldn't start evolution: {error}. Re-run later from `/library` (chain id `{id}` is already saved).",
+      "started": "🧬 Evolution run `{id}` started (status: {status}) on “{name}”. Watch with `/evolution {id}` once that command lands.",
+      "setupNoPlatform": "Platform facade isn't wired — can't set up an evolution. (Set CARE_PLATFORM__BASE_URL.)",
+      "setupUnavailable": "Evolution setup isn't available in this context.",
+      "parseFailed": "/evolution: couldn't parse args ({error}).",
+      "dashboardFailed": "Couldn't open evolution dashboard: {error}",
+      "watchNeedsId": "/evolution watch needs a run id.",
+      "watchNoPlatform": "Platform facade isn't wired — can't stream evolution events.",
+      "watching": "📡 Watching evolution `{runId}`… (Esc to stop)",
+      "streamOpenFailed": "Couldn't open evolution stream `{runId}`: {error}",
+      "streamErrored": "Evolution stream `{runId}` errored: {error}",
+      "streamEnded": "📡 Stream ended ({count} events).",
+      "acceptUsage": "/evolution accept usage: /evolution accept <run_id> <individual_id>",
+      "acceptNoPlatform": "Platform facade isn't wired — can't accept an evolution winner. (Set CARE_PLATFORM__BASE_URL.)",
+      "accepting": "Accepting individual `{individualId}` from evolution `{runId}`…",
+      "acceptFailed": "Couldn't accept `{individualId}` from `{runId}`: {error}",
+      "accepted": "🏁 Accepted individual `{individualId}` from evolution `{runId}` as the winner{tail}.",
+      "snapshotNoPlatform": "Platform facade isn't wired — can't fetch evolution state. (Set CARE_PLATFORM__API_KEY or point CARE_PLATFORM__BASE_URL at your deployment.)",
+      "fetchFailed": "Couldn't fetch evolution `{runId}`: {error}"
+    },
+    "revise": {
+      "noEntity": "Edited chain is ready, but there's no saved entity to version (no id resolved / memory off) — nothing saved.",
+      "saveTitle": "Apply this edit?",
+      "saveBody": "Changes apply to the current chain in this chat. Save to the library with Save when the chain is ready.",
+      "savePreviewEmpty": "No textual summary — see the diff in the chat above.",
+      "noChanges": "No change needed — the chain already satisfies that.",
+      "failed": "Revision failed: {error}",
+      "defaultChainName": "Revised chain",
+      "savedVersionGeneric": "✓ Saved a new version of `{id}`. Inspect with `/library`, run with `/run {id}`.",
+      "saveLabel": "Apply",
+      "discardLabel": "Discard",
+      "discarded": "Revision discarded — nothing changed.",
+      "applied": "✓ Edit applied — run, edit again, or Save to the library when ready.",
+      "versioningHint": "Tip: save each version to the library to compare revisions and roll back easily.",
+      "saveNameTitle": "Name for the new version",
+      "saveNameHint": "Enter a name for the library. The new version branches from the one selected in the dropdown.",
+      "saveNameConfirm": "Save version",
+      "savedVersion": "✓ Saved version v{n} «{name}».",
+      "savedVersionFrom": "✓ Saved version v{n} «{name}» (from v{parent_n})."
+    },
+    "clipboard": {
+      "nothingToQuote": "Nothing to quote yet.",
+      "nothingToCopy": "Nothing to copy yet.",
+      "transcriptEmpty": "Transcript is empty.",
+      "copyFailed": "Copy failed (no clipboard channel available)."
+    },
+    "misc": {
+      "reusingChain": "♻ reusing a chain from earlier in this chat…",
+      "noAppConfig": "No app config available.",
+      "interrupted": "Interrupted."
+    },
+    "dataset": {
+      "parseFailed": "/dataset: couldn't parse args ({error}). Quote task / expected text.",
+      "usage": "/dataset usage:\n  /dataset list <chain_id>\n  /dataset add <chain_id> \"<task>\" --expected \"<output>\"\n  /dataset run <chain_id>\n  /dataset export <chain_id> <path>",
+      "unknownSub": "Unknown /dataset subcommand: {sub}. Try /dataset (no args) for usage.",
+      "listNeedsId": "/dataset list needs a chain id.",
+      "listNoMemory": "Memory facade isn't wired — can't list dataset.",
+      "noEntries": "No dataset entries for chain `{chainId}`. Add one with /dataset add.",
+      "addUsage": "/dataset add usage: /dataset add <chain_id> \"<task>\" --expected \"<output>\"",
+      "addNoMemory": "Memory facade isn't wired — can't add dataset entry.",
+      "addNeedsTaskExpected": "/dataset add needs both a task and --expected output.",
+      "saveFailed": "Couldn't save dataset entry: {error}",
+      "added": "✓ Added dataset entry `{cardId}` for chain `{chainId}`. Run with /dataset run to score.",
+      "runNeedsId": "/dataset run needs a chain id.",
+      "runNoMemory": "Memory facade isn't wired — can't run dataset.",
+      "fetchChainFailed": "Couldn't fetch chain `{chainId}`: {error}",
+      "running": "Running {count} dataset entries…",
+      "entryFailed": "  ✗ [{idx}/{total}] execution failed",
+      "entryPassed": "  ✓ [{idx}/{total}] passed ({scorer})",
+      "entryMismatch": "  ✗ [{idx}/{total}] mismatch ({scorer}) — got: {preview}",
+      "runSummary": "Dataset run: {passed}/{total} passed.",
+      "runToast": "Dataset run finished: {passed}/{total} passed.",
+      "exportUsage": "/dataset export usage: /dataset export <chain_id> <path>",
+      "exportNoMemory": "Memory facade isn't wired — can't export dataset.",
+      "noEntriesExport": "No dataset entries for chain `{chainId}` to export. Add one with /dataset add first.",
+      "mkdirFailed": "Couldn't create directory for {target}: {error}",
+      "writeFailed": "Couldn't write {target}: {error}",
+      "exported": "✓ Exported {count} entries for chain `{chainId}` to `{target}` (JSONL)."
+    },
+    "cmd": {
+      "help": "Show this help",
+      "memory": "View / edit what MAESTRO remembers (CARE.md + long-term memory)",
+      "remember": "Remember a note in long-term memory (also: a `#…` message)",
+      "tour": "5-step guided walkthrough",
+      "mode": "Switch / show current chat mode",
+      "artifacts": "Browse chains generated in this chat",
+      "status": "Print agent chain generator / Memory / Platform health report",
+      "library": "Open your saved chains library",
+      "revise": "AI-edit a saved chain: /revise <id> <change>",
+      "deploy": "Deploy a chain as an HTTP agent: /deploy <id|name> [--channel stable]",
+      "deployments": "List/manage hub agents: /deployments [undeploy|reload|docs <name>]",
+      "metrics": "Per-agent usage + USD cost from the hub: /metrics",
+      "rollback": "Repoint a channel one version back: /rollback <id|name> [--to <vid>]",
+      "versions": "Chain version history: /versions <id|name> [diff <vA> <vB>]",
+      "promote": "Gated release latest→stable: /promote <id|name> [--force]",
+      "marketplace": "Browse the agent_skill marketplace",
+      "runs": "Open local run history (~/.cache/care/runs)",
+      "sandbox": "Audit + revoke trusted AgentSkills",
+      "cost": "Token + spend dashboard",
+      "logs": "Open in-app log viewer",
+      "profile": "List credential profiles",
+      "settings": "Open settings",
+      "run": "Open a saved chain for execution",
+      "resume": "Rehydrate a saved session",
+      "sessions": "List / rehydrate persisted artifact sessions",
+      "theme": "List or switch UI theme",
+      "log": "Tail the rolling app log",
+      "multi": "Open a multi-line task composer",
+      "edit": "Re-edit a past user prompt (1-based turn)",
+      "history": "List recent prompts + saved chains",
+      "blocks": "List / copy / save fenced code blocks",
+      "branch": "Save / list / switch / delete transcript checkpoints",
+      "imgpreview": "Detect terminal-graphics support / build image sequence",
+      "subagents": "Render captured agent chain step events as a tree",
+      "voice": "Voice transcription status (Whisper backend detection)",
+      "export": "Save transcript to disk (md / mdx / json / html)",
+      "clear": "Clear the transcript",
+      "new": "Start a new Interactive conversation (drops context)",
+      "quit": "Exit MAESTRO",
+      "dataset": "Manage dataset entries (list / add / run / export)",
+      "upload": "POST a saved chain to CARE_UPLOAD__URL",
+      "forget": "Soft-delete a chain + its dataset",
+      "evolution": "Evolution primer and runs dashboard"
+    },
+    "help": {
+      "modesIntro": "**Modes** (toggle above the prompt or use `/mode`):",
+      "modesBlock": "  Interactive  Generate a chain, then (by default) confirm\n               before running it — the chain is disposable.\n               Save it with the Save button if you want.\n               Toggle run-immediately in /settings.\n  Production   Generate a reproducible chain, save it to\n               Memory under a stable chain_id, seed a\n               baseline dataset, and (when Platform is\n               wired) kick off evolution.",
+      "currentlyIn": "Currently in: {label}.",
+      "modeLabelInteractive": "Interactive",
+      "modeLabelProduction": "Production",
+      "commandsHeader": "**Commands** {scope}:",
+      "scopeAdHoc": "(Interactive mode commands — switch to /mode production for /dataset)",
+      "scopeProduction": "(Production mode commands)",
+      "datasetList": "Show dataset entries",
+      "datasetRun": "Replay + score entries",
+      "datasetExport": "Write entries as JSONL",
+      "evolutionSetup": "Open the setup modal to launch a new run",
+      "evolutionBare": "Evolution primer, then the runs dashboard",
+      "evolutionList": "Open the runs dashboard",
+      "evolutionSnapshot": "Render evolution state inline",
+      "evolutionWatch": "Stream evolution events live",
+      "evolutionAccept": "Promote winner",
+      "footer": "Anything that isn't a /command is sent to the agent chain generator as a task description.\n\nKeys: Esc interrupt · Ctrl+L clear · Ctrl+↑/↓ history\n      Ctrl+Y copy reply · Ctrl+Shift+Y copy all\n      Ctrl+\\ history sidebar · Alt+T cycle theme\nSelection: drag to highlight any text — release auto-copies to the clipboard. Ctrl+C also copies the current selection (Cmd+C on terminals that forward it)."
+    },
+    "copiedChars": {
+      "one": "Copied {chars} char: {preview}",
+      "many": "Copied {chars} chars: {preview}"
+    }
+  },
+  "artifacts": {
+    "empty": "No artifacts in this chat session yet — generate a chain to populate this view.",
+    "breadcrumb": {
+      "chat": "Chat",
+      "artifacts": "Artifacts"
+    },
+    "column": {
+      "time": "Time",
+      "kind": "Kind",
+      "title": "Title",
+      "saved": "Saved"
+    },
+    "btn": {
+      "showDag": "Show DAG",
+      "showJson": "Show JSON",
+      "saveToLibrary": "Save to library",
+      "savedToLibrary": "★ Saved to library"
+    },
+    "saveAllOne": "Save all unsaved ({count})",
+    "saveAllMany": "Save all unsaved ({count})",
+    "toast": {
+      "inspectChainOnly": "Inspect is only available for chain artifacts; this row is a {kind}.",
+      "inspectNeedsSaved": "Inspect needs a saved chain — press `s` to save this artifact to Memory first.",
+      "inspectFailed": "Inspect failed: {error}",
+      "saveChainOnly": "Only chain artifacts can be saved; this row is a {kind}.",
+      "alreadySaved": "Already saved as {id}.",
+      "saveNeedsMemory": "Save needs a configured Memory facade — configure CARE_MEMORY__BASE_URL first.",
+      "saveCancelled": "Save cancelled.",
+      "saveFailed": "Save failed: {error}",
+      "saveNoEntityId": "Save returned no entity_id.",
+      "savedMarkFailed": "Saved but couldn't mark the local store: {error}",
+      "saved": "Saved → {id}",
+      "openEvolutionFailed": "Couldn't open evolution: {error}",
+      "openEvolutionHint": "Open evolution for `{id}` via the `/evolution {id}` slash command.",
+      "saveAllNeedsMemory": "Save all needs a configured Memory facade — configure CARE_MEMORY__BASE_URL first.",
+      "nothingToSave": "Nothing to save.",
+      "saveAllCancelled": "Save-all cancelled.",
+      "saveFailedFor": "Save failed for {title}: {error}",
+      "saveNoEntityIdFor": "Save returned no entity_id for {title}.",
+      "savedMarkFailedFor": "Saved {title} but couldn't mark local store: {error}",
+      "savedFor": "Saved {title} → {id}",
+      "savedAllOne": "Saved all {count} unsaved chains.",
+      "savedAllMany": "Saved all {count} unsaved chains.",
+      "savedPartial": "Saved {saved} of {total}; {failed} failed.",
+      "dagChainOnly": "DAG view is only available for chain artifacts; this row is a {kind}.",
+      "selectChainOnly": "Only chain artifacts can be selected for diff; this row is a {kind}.",
+      "selectCapHint": "{count} chains selected — diff compares the first two only.",
+      "diffNeedsTwo": "Diff needs two selected chains. Press `space` on two rows first.",
+      "diffOpenFailed": "Couldn't open diff: {error}",
+      "promoteChainOnly": "Only chain artifacts can be promoted; this row is a {kind}.",
+      "promoteNeedsSaved": "Save the chain first (press `s`) before promoting it to stable.",
+      "promoteNeedsMemory": "Promote needs a configured Memory facade — configure CARE_MEMORY__BASE_URL first.",
+      "promoteUnsupported": "Memory facade doesn't expose promote_to_stable — stable channel promotion needs a newer SDK.",
+      "promoteNotSupported": "Promote not supported: {error}",
+      "promoteFailed": "Promote failed: {error}",
+      "promoted": "Pinned {id} latest → stable channel.",
+      "dropFailed": "Drop failed: {error}",
+      "dropped": "Dropped {title} from this session.",
+      "copyFailed": "Copy failed: {error}",
+      "copied": "Copied artifact payload to clipboard."
+    }
+  },
+  "settings": {
+    "keysHint": "Memory + Platform API keys are read from env vars (CARE_MEMORY__API_KEY / CARE_PLATFORM__API_KEY) or your care.toml.",
+    "tab": {
+      "mage": "Generating",
+      "memory": "Memory",
+      "platform": "Evolution",
+      "search": "Search",
+      "theme": "Interface"
+    },
+    "hint": {
+      "mage": "Model + access for the agent chain generator — the engine that turns your task into an agent (a chain of steps). Set what generates and with which key here.",
+      "memory": "Where MAESTRO stores saved chains and their runs (GigaEvo Memory). Needed for Agent-creation mode.",
+      "platform": "Agent evolution (GigaEvo Platform). Mutation = the engine proposing variants; Validation = the judge scoring them. Both are written into the local Platform's llm_models.yml.",
+      "search": "Web-search engine — shared by the agent chain generator and MAESTRO's built-in web_search tool.",
+      "theme": "MAESTRO's appearance and interface language. The interface language doesn't change the agent's answer language."
+    },
+    "field": {
+      "baseUrl": "Base URL",
+      "model": "Model",
+      "apiKey": "API key",
+      "searchEngine": "Search engine",
+      "searchKey": "Search API key",
+      "interactiveRun": "Interactive: before running a generated chain",
+      "interactiveRunAsk": "Ask first (confirm before running)",
+      "interactiveRunAuto": "Run immediately",
+      "uiLanguage": "Interface language",
+      "theme": "Theme",
+      "mutationBaseUrl": "Mutation base URL",
+      "mutationModel": "Mutation model",
+      "mutationApiKey": "Mutation API key",
+      "validationBaseUrl": "Validation base URL",
+      "validationModel": "Validation model",
+      "validationApiKey": "Validation API key"
+    },
+    "action": {
+      "back": "Back",
+      "prev": "< Prev",
+      "next": "Next >",
+      "validate": "Validate",
+      "save": "Save",
+      "clear": "Clear field"
+    }
+  },
+  "library": {
+    "title": "Library",
+    "tabSaved": "Saved",
+    "tabSessions": "Sessions",
+    "sessions": {
+      "empty": "No session chains here — “General …” chains from chat appear on this tab."
+    },
+    "action": {
+      "chat": {
+        "label": "Chat",
+        "description": "Return to the chat screen"
+      },
+      "delete": {
+        "label": "Delete",
+        "description": "Soft-delete the focused chain (recoverable)"
+      },
+      "back": "← Back"
+    },
+    "columns": {
+      "name": "Name",
+      "domain": "Domain",
+      "steps": "Steps",
+      "lastRun": "Last Run",
+      "runs": "Runs",
+      "fitness": "Fitness",
+      "cost": "Cost",
+      "tags": "Tags"
+    },
+    "rowAction": {
+      "run": {
+        "label": "Run",
+        "description": "Run this agent with its saved task + context files"
+      },
+      "open": {
+        "label": "Open",
+        "description": "View the chain in InspectionScreen"
+      },
+      "edit": {
+        "label": "Edit",
+        "description": "Open EditAgentScreen to mutate prompts / metadata"
+      },
+      "duplicate": {
+        "label": "Duplicate",
+        "description": "Save a copy under a new name"
+      },
+      "evolve": {
+        "label": "Evolve",
+        "description": "Submit to GigaEvo Platform for evolutionary improvement"
+      },
+      "archiveEvolutions": {
+        "label": "Archive evolutions",
+        "description": "Stop any running evolution runs of this chain and add them to the dashboard's Archived tab"
+      },
+      "showLineage": {
+        "label": "Show lineage",
+        "description": "Open the ancestry DAG in the lineage modal"
+      },
+      "toggleFavourite": {
+        "label": "Toggle favourite",
+        "description": "Star / unstar this row"
+      },
+      "delete": {
+        "label": "Delete",
+        "description": "Soft-delete this row (recoverable from Memory's trash)"
+      }
+    },
+    "confirm": {
+      "itemOne": "item",
+      "itemMany": "items",
+      "bulkTitle": "{label} {count} {item}?"
+    },
+    "archive": {
+      "title": "Archive runs",
+      "platformNotConfigured": "Platform facade isn't configured — set CARE_PLATFORM__BASE_URL first.",
+      "listFailed": "Couldn't list evolutions: {error}",
+      "noRuns": "No evolution runs found for {id}…",
+      "archived": "Archived {count} run(s)",
+      "stopped": "{count} stopped server-side",
+      "failed": "{count} stop attempt(s) failed",
+      "seeTab": "(see Archived tab on /evolution)."
+    },
+    "runToast": "Run {id}: use `care run {id} --execute` (TUI executor wiring pending).",
+    "diff": {
+      "needTwo": "Diff needs exactly two selected rows (got {count}). Spacebar two rows first.",
+      "chainOnly": "Diff is chain-only; selection contains {kinds}.",
+      "needMemory": "Diff needs a configured Memory facade — set CARE_MEMORY__BASE_URL first.",
+      "openFailed": "Couldn't open diff: {error}"
+    },
+    "import": {
+      "needMemory": "Import needs a configured Memory facade — set CARE_MEMORY__BASE_URL first.",
+      "done": "Imported {count} chain(s).",
+      "openFailed": "Couldn't open import: {error}"
+    },
+    "export": {
+      "needMemory": "Export needs a configured Memory facade — set CARE_MEMORY__BASE_URL first.",
+      "needSelection": "Export needs a focused row or a multi-selection — spacebar one or more rows first.",
+      "chainCentric": "Export is chain-centric; this row is a {kind}.",
+      "needChain": "Export needs at least one chain in the selection.",
+      "dropped": "Dropped {count} non-chain / non-skill row(s) from the export (only chains + agent_skills are exportable).",
+      "done": "Exported {chains} chain(s) + {skills} skill(s).",
+      "openFailed": "Couldn't open export: {error}"
+    },
+    "bulk": {
+      "deleteNeedSelection": "Bulk-delete needs a selection — spacebar one or more rows first.",
+      "tagNeedSelection": "Bulk-tag needs a selection — spacebar one or more rows first."
+    },
+    "sidebar": {
+      "filters": "Filters",
+      "searchPlaceholder": "Search…",
+      "status": "Status",
+      "statusAll": "All",
+      "statusDraft": "Draft",
+      "statusRunnable": "Runnable",
+      "statusEvolved": "Evolved",
+      "options": "Options",
+      "favouritesOnly": "Favourites only",
+      "collections": "Collections",
+      "allCollections": "All collections",
+      "tags": "Tags"
+    },
+    "empty": {
+      "noLibrary": {
+        "title": "Your library is empty",
+        "message": "You haven't saved any chains yet. Generate a fresh one — or if you've been chatting already, jump back and try /artifacts to save a chain from the current conversation.",
+        "primary": "Create your first chain",
+        "secondary": "Back to chat",
+        "hint": "Press Ctrl+N anywhere in MAESTRO to start a fresh generation, or Esc to return to chat."
+      },
+      "noResults": {
+        "title": "No chains match your filters",
+        "message": "Your namespace has saved chains, but none match the current search or filter selection.",
+        "primary": "Clear filters"
+      },
+      "loading": {
+        "title": "Loading…",
+        "message": "Fetching your library from Memory."
+      },
+      "error": {
+        "title": "Couldn't load your library",
+        "message": "MAESTRO couldn't reach Memory or the response was malformed. Check your Memory connection and retry.",
+        "primary": "Retry"
+      }
+    }
+  },
+  "common": {
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close",
+    "discard": "Discard",
+    "save": "Save",
+    "submit": "Submit",
+    "confirm": "Confirm",
+    "refresh": "Refresh",
+    "launch": "Launch",
+    "clear": "Clear",
+    "home": "Home",
+    "up": "Up",
+    "loading": "(loading…)",
+    "noData": "(no data)",
+    "displayName": "Display name",
+    "description": "Description",
+    "tags": "Tags (comma-separated)",
+    "tagsPlaceholder": "tag1, tag2",
+    "taskDescription": "Task description"
+  },
+  "help": {
+    "walkthrough": "WALKTHROUGH",
+    "keyBindings": "KEY BINDINGS",
+    "empty": "(no help content registered)"
+  },
+  "welcome": {
+    "recents": "Recents",
+    "noRuns": "(no runs yet)"
+  },
+  "generation": {
+    "stages": "AGENT CHAIN GENERATOR STAGES",
+    "streamingDag": "STREAMING DAG",
+    "dagHint": "Step descriptions land as each stage emits an artifact."
+  },
+  "execution": {
+    "flow": "FLOW",
+    "flowLatency": " · latency",
+    "steps": "STEPS",
+    "llmStream": "LLM STREAM",
+    "telemetry": "TELEMETRY",
+    "stepCount": "0/0 steps",
+    "stepHeader": "Step {n}",
+    "noOutput": "(no output)"
+  },
+  "cost": {
+    "byProvider": "BY PROVIDER",
+    "byChain": "BY CHAIN",
+    "byMode": "BY MODE",
+    "empty": "No local run history yet — `/runs` shows the source data; populate it via `care run` or chat execution before this dashboard becomes useful."
+  },
+  "inspection": {
+    "tabChain": "Chain",
+    "tabRunHistory": "Run history",
+    "tabArtifacts": "Artifacts",
+    "tabIntegration": "Integration",
+    "steps": "STEPS",
+    "detail": "DETAIL",
+    "dag": "DAG",
+    "run": "Run",
+    "edit": "Edit",
+    "evolve": "Evolve",
+    "exportMd": "Export chain",
+    "delete": "Delete",
+    "exported": "Exported chain to {path}",
+    "exportFailed": "Markdown export failed: {error}",
+    "exportNoChain": "No chain loaded to export yet.",
+    "integrationHint": "Press `t` to cycle snippet language, `y` to copy the chain_id, `c` to copy the active snippet, `u` for the full Use-It-Now reveal, `L` to open lineage.",
+    "noArtifacts": "(no intermediate artifacts)",
+    "noSteps": "(no steps)",
+    "noDetail": "(no further detail)",
+    "col": {
+      "when": "When",
+      "status": "Status",
+      "run": "Run",
+      "duration": "Duration",
+      "tokens": "Tokens",
+      "error": "Error"
+    },
+    "breadcrumb": "Inspect",
+    "loading": "Loading…",
+    "noChain": "no chain loaded",
+    "field": {
+      "dependsOn": "Depends on",
+      "triggeredBy": "Triggered by",
+      "aim": "Aim",
+      "reasoningQuestions": "Reasoning questions",
+      "stageAction": "Stage action",
+      "exampleReasoning": "Example reasoning",
+      "model": "Model",
+      "temperature": "Temperature",
+      "config": "Config",
+      "contextQueries": "Context queries"
+    },
+    "deleteTitle": "Delete this chain?",
+    "deleteBody": "{name}\n\nSoft-delete — recoverable from Memory's trash.",
+    "deleted": "Deleted {name}.",
+    "deleteFailed": "Delete failed: {error}",
+    "openUseItNowFailed": "Couldn't open Use-It-Now: {error}",
+    "openEvolutionFailed": "Couldn't open evolution: {error}",
+    "evolutionHint": "Open evolution for `{id}` via the `/evolution {id}` slash command.",
+    "openLineageFailed": "Couldn't open lineage: {error}",
+    "copyFailed": "Copy failed: {error}",
+    "copied": "Copied {label} to clipboard.",
+    "history": {
+      "noRuns": "No runs yet",
+      "runs": "runs: {n}",
+      "ok": "ok: {n}",
+      "failed": "failed: {n}",
+      "success": "success: {pct}%",
+      "avg": "avg: {secs}s",
+      "tokens": "tokens: {n}"
+    }
+  },
+  "evolution": {
+    "status": "STATUS",
+    "submitting": "submitting…",
+    "events": "EVENTS",
+    "paretoFront": "PARETO FRONT",
+    "scatter": "Scatter",
+    "tabFitness": "Fitness",
+    "tabStatistics": "Statistics",
+    "tabPareto": "Pareto Front",
+    "tabPrograms": "Programs",
+    "tabVersions": "Versions",
+    "bestFitness": "Best fitness vs. generation",
+    "validInvalid": "Valid vs. invalid programs",
+    "fitnessGrowth": "Fitness-growth versions",
+    "viewChain": "View: Chain",
+    "viewDiff": "View: Diff",
+    "versionsNoGrowthPoints": "No growth points yet — once a mutation beats the seed fitness, the version will appear in the list on the left.",
+    "versionsChainUnavailable": "(Chain content is not available for this version yet. If the run is still active, CARE will retry via Redis; after completion the Platform serves best_chain_config from MinIO.)",
+    "versionsDiffNeither": "(no chain content available for either version)",
+    "versionsDiffFirstPoint": "(This is the first growth point — nothing to diff against.)",
+    "versionsDiffCurrUnavailable": "(Chain content for this version is not available yet.)",
+    "versionsDiffEmpty": "(no differences between these two versions)",
+    "versionsMutationRationale": "Mutation rationale",
+    "versionsChanges": "Changes:",
+    "versionsGenLabel": "Generation:",
+    "versionsFitnessLabel": "Fitness:",
+    "versionsProgramLabel": "Program:",
+    "versionsDiffFrom": "previous version",
+    "versionsDiffTo": "this version",
+    "stopArchive": "Stop + Archive",
+    "selectVersion": "Select a version on the left to preview its chain.",
+    "noFitnessData": "(no fitness data yet)",
+    "needsObjectives": "(needs ≥ 2 objectives)",
+    "noProgramData": "(no program data yet)",
+    "acceptWinner": "Accept winner",
+    "acceptErrorTitle": "Accept error",
+    "acceptBlockedTitle": "Accept blocked",
+    "acceptFailed": "Accept failed: {error}",
+    "acceptConfirmTitle": "Accept this evolved individual?",
+    "acceptConfirmBody": "This flips the chain's `latest` pointer in Memory. External services reading by id pick up the change on their next fetch.",
+    "runArchived": "Archived run {id}… — find it in the Archived tab on the dashboard.",
+    "runArchivedTitle": "Run archived",
+    "col": {
+      "star": "★",
+      "id": "ID",
+      "gen": "Gen",
+      "fitness": "Fitness",
+      "summary": "Summary",
+      "delta": "Δ",
+      "objectives": "Objectives"
+    },
+    "paretoDetailEmpty": "Highlight a row to see its objectives + full summary."
+  },
+  "evolutionDashboard": {
+    "breadcrumbRoot": "Evolution",
+    "breadcrumb": "Dashboard",
+    "col": {
+      "status": "Status",
+      "run": "Run",
+      "baseChain": "Base chain",
+      "gen": "Gen",
+      "best": "Best",
+      "started": "Started",
+      "elapsed": "Elapsed",
+      "current": "Current",
+      "valid": "Valid",
+      "invalid": "Invalid"
+    },
+    "backToChat": "Back to chat",
+    "archive": "Archive",
+    "stopRun": "Stop run",
+    "refresh": "Refresh",
+    "tabActive": "Active",
+    "tabArchived": "Archived",
+    "emptyArchived": "No archived runs yet. Highlight a row in the Active tab and press 'a' to archive it.",
+    "emptyAllArchived": "All {count} run(s) are archived — switch to the Archived tab to view them.",
+    "emptyNoRuns": "No evolutions yet. Launch one with `Evolve with my data` (E) on a library row.",
+    "openFailed": "Couldn't open evolution: {error}",
+    "cancelUnavailable": "Platform SDK doesn't expose cancel() yet — stop the run from the upstream service for now. (Filed as a §10 cross-module ask.)",
+    "stopFailed": "Stop failed: {error}",
+    "stopRequested": "Stop requested for {runId}.",
+    "compareLimit": "Compare is limited to 2 runs — deselect one of the marked rows first.",
+    "compareNeed": {
+      "one": "Mark {count} more run with `space` first, then press `c` to compare.",
+      "many": "Mark {count} more run(s) with `space` first, then press `c` to compare."
+    },
+    "compareOpenFailed": "Couldn't open compare modal: {error}",
+    "comparePushFailed": "Couldn't push compare modal: {error}",
+    "runArchived": "Run archived: {runId}…",
+    "runUnarchived": "Run unarchived: {runId}…"
+  },
+  "marketplace": {
+    "searchPlaceholder": "Search shared agent skills…",
+    "tags": "TAGS",
+    "results": "RESULTS",
+    "typeToSearch": "(type to search)",
+    "noTags": "(no tags)",
+    "install": "Install",
+    "colStar": "★",
+    "colScore": "Score",
+    "colName": "Name",
+    "colMatched": "Matched",
+    "colTags": "Tags",
+    "noMemoryFacade": "no memory facade configured",
+    "saveUnavailable": "memory.client.save_agent_skill is unavailable",
+    "installFailed": "install failed: {error}",
+    "installed": "Installed {name}",
+    "noResults": "no results for {query}",
+    "filteredBy": " · filtered by #{tag}",
+    "listingCount": "{count} listing(s) for {query}{suffix}"
+  },
+  "catalog": {
+    "kinds": "KINDS",
+    "entries": "ENTRIES",
+    "promote": "Promote",
+    "colKind": "Kind",
+    "colName": "Name",
+    "colSource": "Source",
+    "colTags": "Tags",
+    "colSummary": "Summary",
+    "promoteOnlySkills": "Promote is only available for agent_skill entries (this one is `{kind}`).",
+    "empty": "(no entries — pass --skills / --tools / --mcp-config to build_catalog)",
+    "filteredTo": " · filtered to #{kind}",
+    "entryCount": {
+      "one": "{count} entry{filter}",
+      "many": "{count} entries{filter}"
+    },
+    "warningsHeader": "⚠ {count} discovery warning(s):",
+    "warningsMore": "  · … {count} more"
+  },
+  "importBundle": {
+    "title": "Import bundle",
+    "tarballPath": "Tarball path",
+    "noPreview": "(no preview)",
+    "onCollision": "On collision",
+    "collisionSkip": "Skip — keep existing entities",
+    "collisionOverwrite": "Overwrite — write new version",
+    "collisionRaise": "Raise — abort on first collision",
+    "dryRun": "Dry-run (preview without writing)",
+    "preview": "Preview",
+    "import": "Import"
+  },
+  "saveAgent": {
+    "title": "Save agent",
+    "namePlaceholder": "e.g. Storm watcher",
+    "favourite": "★ Favourite",
+    "keepContext": "Keep generation context (query + files)",
+    "saveInspect": "Save & Inspect",
+    "saveRun": "Save & Run"
+  },
+  "editAgent": {
+    "changeSummary": "Change summary (required for structural edits)",
+    "promoteStable": "Promote to stable",
+    "tabMetadata": "Metadata",
+    "tabContent": "Content",
+    "contentHint": "Edit the chain content (steps and their fields) as JSON, then press Save (Ctrl+S). Display name, tags and task description come from the Metadata tab.",
+    "contentInvalidJson": "Invalid JSON: {error}",
+    "saveBlocked": "Can't save: {reason}",
+    "defaultChangeSummary": "Manually edited chain content"
+  },
+  "tagEditor": {
+    "name": "Name",
+    "namePlaceholder": "Chain name",
+    "addTags": "Add tags (comma-separated)",
+    "addPlaceholder": "urgent, q4",
+    "removeTags": "Remove tags (comma-separated)",
+    "removePlaceholder": "draft",
+    "apply": "Apply"
+  },
+  "runContext": {
+    "contextFiles": "Context files",
+    "noContextFiles": "(no context files)",
+    "noContextFilesHint": "Files saved with the chain appear here. Attach more below — Browse… or type a path / @path.",
+    "browse": "Browse…",
+    "attachPlaceholder": "Attach a file — type a path or @path, then Enter",
+    "attachNotFound": "File not found: {path}",
+    "attached": "✓ Attached {name}",
+    "requiredMissing": "⚠ This chain needs {count} file(s) that are missing — attach them (Browse / @path) or drop them to run without.",
+    "docNeeded": "⚠ This chain reads a document — attach the file to run on (Browse / @path).",
+    "overrides": "Overrides",
+    "modelOverride": "Model override (leave blank for default)",
+    "chooseModel": "Choose default model",
+    "modelPlaceholder": "Model id (leave blank for the config default)",
+    "modelPlaceholderNamed": "{model} (leave blank for the config default)",
+    "connection": "Connection settings (base URL / API key)",
+    "baseUrl": "Base URL",
+    "baseUrlPlaceholder": "leave blank for the config default",
+    "apiKey": "API key",
+    "apiKeyPlaceholder": "leave blank for the config default",
+    "streaming": "Streaming",
+    "run": "Run",
+    "title": "Run",
+    "titleNamed": "Run · {name}",
+    "runModified": "Run (modified)",
+    "restore": "Restore",
+    "drop": "Drop"
+  },
+  "exportChain": {
+    "outputPath": "Output path",
+    "format": "Format",
+    "formatJson": "JSON (round-trip safe)",
+    "formatPython": "Python (runnable script)",
+    "formatMarkdown": "Markdown (walkthrough + Python)",
+    "browse": "Browse…",
+    "export": "Export",
+    "title": "Export chain: {name}",
+    "stepCount": {
+      "one": "{count} step",
+      "many": "{count} steps"
+    },
+    "wrote": "wrote {name} ({bytes} bytes, {format})"
+  },
+  "dirPicker": {
+    "title": "Pick a destination folder",
+    "select": "Select folder",
+    "up": "↑ Up"
+  },
+  "filePicker": {
+    "title": "Pick a file",
+    "select": "Select file",
+    "noneSelected": "No file selected — click one in the tree"
+  },
+  "helpModal": {
+    "title": "Help",
+    "data": "Working with data",
+    "skill": "Add as a coding-agent skill"
+  },
+  "resume": {
+    "title": "Resume previous job?",
+    "resume": "Resume"
+  },
+  "multiCompose": {
+    "title": "Compose a multi-line task",
+    "hint": "Type your multi-line task. Ctrl+J / Ctrl+S submits, Esc cancels."
+  },
+  "humanInput": {
+    "title": "Agent chain needs input",
+    "noPrompt": "(no prompt provided)",
+    "answerPlaceholder": "Type your answer…"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "Type to search commands + agents…",
+    "badgeChain": "chain",
+    "badgeSkill": "skill",
+    "cmd": {
+      "openChat": {
+        "label": "Open Chat",
+        "description": "Return to the main chat (home screen)"
+      },
+      "openArtifacts": {
+        "label": "Open Artifacts",
+        "description": "Browse agent chains generated during this chat session"
+      },
+      "openLibrary": {
+        "label": "Open Library",
+        "description": "Switch to LibraryScreen — your saved chains"
+      },
+      "openEvolution": {
+        "label": "Open Evolution",
+        "description": "Open the evolution dashboard — active + recent runs"
+      },
+      "openSettings": {
+        "label": "Open Settings",
+        "description": "Edit MAESTRO configuration + Memory / agent chain generator credentials"
+      },
+      "createNewAgent": {
+        "label": "Create new agent",
+        "description": "Open QueryScreen to generate a fresh chain via the agent chain generator"
+      },
+      "importBundle": {
+        "label": "Import bundle",
+        "description": "Restore agents from a .tar.gz bundle"
+      },
+      "exportLibrary": {
+        "label": "Export library",
+        "description": "Pack selected agents into a shareable .tar.gz"
+      },
+      "help": {
+        "label": "Help",
+        "description": "Open the MAESTRO keyboard / command reference"
+      },
+      "catalog": {
+        "label": "Browse capability catalog",
+        "description": "Open CatalogScreen — installed agent_skills, MCP servers, tools, memory cards"
+      },
+      "marketplace": {
+        "label": "Browse capability marketplace",
+        "description": "Open MarketplaceScreen — search shared agent_skill listings on Memory"
+      },
+      "quit": {
+        "label": "Quit MAESTRO",
+        "description": "Exit the application"
+      }
+    }
+  },
+  "taskSetup": {
+    "defaultTask": "Summarize the key findings across the provided documents and propose three concrete follow-up experiments.",
+    "tabTask": "Task",
+    "tabFiles": "Files",
+    "tabContext": "Context",
+    "tabHints": "Hints",
+    "taskPrompt": "What should the agent ecosystem accomplish?",
+    "generate": "Generate pipeline",
+    "filesHint": "Select a file in the tree to add it as context.",
+    "contextHint": "Press Delete on a row to remove it.",
+    "hintsHint": "Optional — fields you skip are filled by the agent chain generator.",
+    "domainPlaceholder": "Domain hint (optional)",
+    "maxStepsPlaceholder": "Max steps (optional)",
+    "runtime": "Runtime",
+    "runtimeLocal": "Local",
+    "runtimeDocker": "Docker",
+    "runtimeE2b": "E2B",
+    "fastMode": "Fast mode (single-shot, skip deep enhancements)",
+    "colPath": "Path",
+    "colSize": "Size"
+  },
+  "pipelinePreview": {
+    "title": "GENERATED PIPELINE",
+    "hint": "Describe a task and pick context files, then press Generate.",
+    "emptyState": "no pipeline yet — press Generate pipeline",
+    "taskLine": "task: {task}",
+    "contextLine": "context: {count} file(s)"
+  },
+  "header": {
+    "backHint": "Esc to go back",
+    "library": "My chains",
+    "libraryTip": "Open your saved chains (same as /library)",
+    "evolution": "Evolution",
+    "evolutionTip": "Short guide: what evolution is and how to launch it",
+    "help": "Help",
+    "helpTip": "More: working with data, add as a coding-agent skill",
+    "breadcrumb": {
+      "library": "Library",
+      "chat": "Chat",
+      "settings": "Settings",
+      "profile": "Profile",
+      "help": "Help",
+      "runs": "Runs",
+      "cost": "Cost",
+      "catalog": "Catalog",
+      "edit": "Edit",
+      "evolve": "Evolve",
+      "generate": "Generate",
+      "marketplace": "Marketplace",
+      "newAgent": "+ New agent",
+      "replay": "Replay",
+      "sandbox": "Sandbox",
+      "trust": "Trust"
+    }
+  },
+  "statusBar": {
+    "placeholder": "memory ? · platform ? · …",
+    "error": "⚠ status bar: {err}"
+  },
+  "globalBindings": {
+    "palette": {
+      "label": "Palette",
+      "description": "Open the fuzzy-search command palette"
+    },
+    "save": {
+      "label": "Save",
+      "description": "Save the current artifact to Memory"
+    },
+    "rerun": {
+      "label": "Re-run",
+      "description": "Re-run the current chain or evolution"
+    },
+    "back": {
+      "description": "Dismiss / go back"
+    },
+    "quit": {
+      "label": "Quit",
+      "description": "Exit MAESTRO"
+    }
+  },
+  "diff": {
+    "title": "Diff · {left}  ↔  {right}",
+    "metadataUnchanged": "(metadata unchanged)"
+  },
+  "lineage": {
+    "title": "Lineage · {id}",
+    "rerun": "Re-run from here",
+    "colVersion": "Version",
+    "colDepth": "Depth",
+    "colGen": "Gen",
+    "colFitness": "Fitness",
+    "colSummary": "Summary",
+    "noData": "(no lineage data)",
+    "noMemory": "no memory facade configured"
+  },
+  "sandboxTrust": {
+    "colName": "Name",
+    "colUri": "URI",
+    "colSha": "SHA",
+    "colApproved": "Approved",
+    "colPolicy": "Policy",
+    "colTools": "Tools",
+    "empty": "No trusted skills yet — install one from `/marketplace` to populate this list.",
+    "statusOne": "{n} trusted skill",
+    "statusMany": "{n} trusted skills",
+    "revokeTitle": "Revoke skill trust?",
+    "revokeBody": "Next execution of this exact SKILL.md SHA will trigger the re-approval prompt.",
+    "revoke": "Revoke",
+    "highlightFirst": "Highlight a row first.",
+    "storeNotLoaded": "Trust store not loaded.",
+    "revokeFailed": "Revoke failed: {error}",
+    "alreadyRevoked": "Already revoked.",
+    "revoked": "Revoked {name}."
+  },
+  "runs": {
+    "colWhen": "When",
+    "colChain": "Chain",
+    "colStatus": "Status",
+    "colDuration": "Duration",
+    "colTokens": "Tokens",
+    "colCost": "Cost",
+    "empty": "No local run history yet — run a chain via `care run <id> --execute` or in chat to populate this table.",
+    "statusOne": "{n} run (capped at {limit})",
+    "statusMany": "{n} runs (capped at {limit})",
+    "replayMissing": "Replay sidecar missing: {path}",
+    "replayFailed": "Couldn't open replay: {error}",
+    "inspectRun": "Run {run_id} on chain {chain_id}",
+    "inspectRunChain": "Run {run_id} on chain {chain_id} — `/library` to inspect {chain_id}."
+  },
+  "profile": {
+    "colActive": "Active",
+    "colName": "Name",
+    "colPath": "Path",
+    "colModified": "Modified",
+    "colSize": "Size",
+    "hint": "Switch profile: `export CARE_PROFILE=<name>` + restart MAESTRO.",
+    "empty": "No profiles under `~/.config/care/profiles/`. Drop a `<name>.toml` there + set `CARE_PROFILE=<name>` before launching MAESTRO to use it.",
+    "statusOne": "{n} profile",
+    "statusMany": "{n} profiles",
+    "statusActive": "{count}  ·  active: {name}",
+    "statusDefault": "{count}  ·  active: (default config.toml — no CARE_PROFILE set)"
+  },
+  "logs": {
+    "filterPlaceholder": "module substring (e.g. care.chat) — Enter to apply, empty to clear",
+    "breadcrumb": "Logs",
+    "metaNone": "log: (none)",
+    "metaPath": "log: {path}",
+    "emptyNoFile": "No log file found. Set CARE_LOG_FILE or run `make run LOG=1` to enable file logging.",
+    "emptyFiltered": "{path} is empty (or filtered out by current level).",
+    "statusLinesOne": "{n} line",
+    "statusLinesMany": "{n} lines",
+    "statusLevel": "level ≥ {floor}",
+    "statusModule": "module ~ '{substr}'",
+    "statusHint": "`l` cycle · `m` filter"
+  },
+  "export": {
+    "title": "Export library",
+    "outputPath": "Output path",
+    "includeSkills": "Include AgentSkill pins",
+    "export": "Export",
+    "summaryChains": {
+      "one": "{n} chain",
+      "many": "{n} chains"
+    },
+    "summarySkills": {
+      "one": "{n} skill",
+      "many": "{n} skills"
+    },
+    "wroteItems": {
+      "one": "wrote {n} item",
+      "many": "wrote {n} items"
+    },
+    "bytes": "{n} bytes",
+    "skipped": "skipped {n}"
+  },
+  "dataIntro": {
+    "title": "Working with data in MAESTRO",
+    "whatTitle": "What is it?",
+    "whatBody": "Three ways to give MAESTRO your source material:\n• @file in chat — embed a document in a new task\n• Library → Run — re-run a saved chain with a task and context files\n• /dataset — scored examples for evaluation and evolution",
+    "whyTitle": "Why it matters",
+    "whyBody": "Chains need your text or documents to produce useful answers. Datasets let you measure quality over time and feed evolution on Platform.",
+    "howTitle": "How to use it",
+    "howBody": "1. New task in chat\n   Summarize @README.md\n   → file contents are embedded when the chain is generated and first run.\n\n2. Re-run a saved chain\n   /library → select a row → Run (or R on the inspection screen)\n   → edit the task and toggle context files.\n   Note: /run <id> only opens the inspector — use Library → Run to execute.\n\n3. Evaluation & evolution\n   /dataset add <chain_id> \"input\" --expected \"output\"\n   /dataset run <chain_id>\n   → grows the eval set for scoring and evolution.",
+    "close": "Got it",
+    "openHelp": "Open /help"
+  },
+  "evolutionIntro": {
+    "title": "About chain evolution",
+    "whatTitle": "What is it?",
+    "whatBody": "Evolution automatically improves a saved agent chain on GigaEvo Platform. The engine proposes variants (prompts, step wiring) and scores each one on your evaluation dataset — like a small genetic search over chain designs.",
+    "whyTitle": "Why use it?",
+    "whyBody": "A first draft chain is rarely optimal. Evolution finds better variants without hand-editing every step. You keep a reproducible agent in Memory and let the platform explore improvements against measurable examples.",
+    "howTitle": "How to run it in MAESTRO",
+    "howBody": "1. Generate a chain in chat and save it to the library — with the Save button (or via /library).\n2. Open the library, highlight a row, and press E — Evolve with my data.\n3. In the Set up evolution modal, set the JSONL path (input and expected columns), optional rubric and limits — Launch.\n4. On the evolution screen, watch the run; Accept winner (key a) promotes the best variant back to Memory.\n\nTip: /evolution list shows all runs. Esc on the evolution screen stops the run on Platform.",
+    "close": "Got it",
+    "openDashboard": "Open runs list"
+  },
+  "evolutionLaunch": {
+    "title": "Launch evolution: {id}",
+    "titleGeneric": "Set up evolution",
+    "baseChain": "Base chain (id to evolve):",
+    "baseChainPlaceholder": "chain id to evolve (e.g. chain-7f3a…)",
+    "errorNoChain": "Enter a base chain id to evolve.",
+    "dataset": "Dataset (JSONL path):",
+    "rubric": "Rubric (success criteria):",
+    "rubricPlaceholder": "answer matches expected, ≤2 tool calls",
+    "validationType": "Validation type:",
+    "continuousMetric": "Continuous metric:",
+    "binaryMethod": "Binary method:",
+    "targetColumn": "Target column (dataset):",
+    "maxIterations": "Max iterations:",
+    "populationSize": "Population size:",
+    "mutationMaxTokens": "Mutation LLM max tokens (completion limit):",
+    "maxWallTime": "Max wall-time seconds (blank = no cap):",
+    "modelWhitelist": "Model whitelist (comma-separated, blank = all):",
+    "tokenCostCap": "Token cost cap USD (blank = no cap):",
+    "budget": "Budget: ~{evals} chain evaluations ({pop}/gen × {gens} gens) · ~{tokens} tokens (rough est.)"
+  },
+  "evolutionCompare": {
+    "title": "Compare evolution runs",
+    "left": "left · {id}",
+    "right": "right · {id}",
+    "noPlatform": "no platform configured",
+    "noGetEvolution": "platform SDK doesn't expose get_evolution() yet",
+    "noFitnessData": "(no fitness data yet)"
+  },
+  "replay": {
+    "steps": "STEPS",
+    "detail": "DETAIL",
+    "noSteps": "(no steps)",
+    "noStepSelected": "(no step selected)",
+    "emptySession": "(empty session)",
+    "truncated": "… (truncated)",
+    "statusOk": "ok",
+    "statusSkipped": "skipped",
+    "statusFailed": "failed"
+  },
+  "useItNow": {
+    "evolveThisNow": "Evolve this now",
+    "savedNamed": "Saved: {name}",
+    "savedToMemory": "Saved to Memory",
+    "version": "version: {version}",
+    "channel": "channel: {channel}",
+    "copyFailed": "Copy failed: {error}",
+    "copied": "Copied {label} to clipboard."
+  },
+  "saveReport": {
+    "title": "Save-all report",
+    "noAttempts": "no save attempts recorded",
+    "savedAll": "saved all {total} artifact(s)",
+    "savedSome": "saved {saved} of {total}  ·  {failed} failed",
+    "rowFailed": "This row failed — there's no entity_id to show.",
+    "noEntityId": "Row has no entity_id recorded."
+  },
+  "taskList": {
+    "cancelSelected": "Cancel selected",
+    "switchTo": "Switch to",
+    "title": "Tasks{suffix}",
+    "activeSuffix": " (active)"
+  },
+  "conflict": {
+    "title": "Conflict · {name}",
+    "unnamed": "(unnamed)",
+    "keepExisting": "Keep existing",
+    "acceptIncoming": "Accept incoming",
+    "newVersion": "New version",
+    "entity": "entity",
+    "summaryIdentical": "{kind} {existing} already exists with identical content — saving is a no-op.",
+    "summaryDifferent": "{kind} {existing} already exists with different content.",
+    "noDifferences": "(no differences)",
+    "diffUnavailable": "(diff unavailable)"
+  }
+}

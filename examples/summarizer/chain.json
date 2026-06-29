@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "name": "easy-summarizer-platform",
+  "task_description": "Summarize each dataset row into one sentence in the same language as the input. Platform feeds each CSV row as outer_context (all columns except expected).",
+  "steps": [
+    {
+      "number": 1,
+      "title": "Summarize paragraph",
+      "step_type": "llm",
+      "dependencies": [],
+      "aim": "Produce exactly one concise sentence that captures the main idea of the source text",
+      "stage_action": "Read the paragraph in the context (field input). Reply with a single sentence summary in the same language as the input. No markdown, no quotes, no preamble.",
+      "reasoning_questions": "What is the core fact? How to express it in one short sentence?"
+    }
+  ]
+}

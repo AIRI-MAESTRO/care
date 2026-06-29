@@ -1,0 +1,9 @@
+# MCP server config for the asciicast demo. The recording
+# walks `care catalog --mcp-config` past this file to show one
+# server lighting up in the catalog output.
+
+[servers.weather]
+command = "uvx"
+args = ["mcp-weather"]
+description = "Forecast + alerts MCP server (asciicast demo placeholder)."
+tags = ["weather", "demo"]
