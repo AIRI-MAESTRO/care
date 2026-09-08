@@ -11,6 +11,8 @@ Covers:
 from __future__ import annotations
 
 import asyncio
+import inspect
+import json
 
 import httpx
 import pytest
@@ -295,6 +297,462 @@ def test_http_request_success(monkeypatch):
     assert "HTTP 201 POST" in out
     assert "https://api.example.com/x" in out
     assert '{"ok": true}' in out
+
+
+# ---------------------------------------------------------------------------
+# STARM solvers
+# ---------------------------------------------------------------------------
+
+
+class _StarmCfg:
+    """Duck-typed ToolsConfig with three STARM servers configured."""
+
+    starm_host = "http://localhost"
+    starm_ports = {"sudoku": 8081, "game_of_life": 8082, "arc_agi_1": 8083}
+    starm_timeout = 5.0
+    enable_code_exec = False
+
+
+def _solvers(cfg=None):
+    ctx = _StubCtx()
+    builtin_tools.register_builtin_tools(ctx, cfg or _StarmCfg(), CareConfig().sandbox)
+    return ctx
+
+
+def test_starm_registers_one_solver_per_configured_task():
+    ctx = _solvers()
+    assert {"solve_sudoku", "solve_game_of_life", "solve_arc_agi_1"} <= set(ctx.registered)
+    assert "starm_solve" not in ctx.registered  # no generic entry point
+    assert "algorithmic" in ctx.tags["solve_sudoku"]
+
+
+def test_starm_registers_nothing_without_configured_servers():
+    """A solver with no server behind it would only mislead the planner."""
+    ctx = _solvers(CareConfig().tools)
+    assert not [name for name in ctx.registered if name.startswith("solve_")]
+
+
+def test_starm_solver_signatures():
+    ctx = _solvers()
+    assert list(inspect.signature(ctx.registered["solve_sudoku"]).parameters) == [
+        "problem"
+    ]
+    # ARC selects a learned puzzle embedding, so its id is a real argument.
+    assert list(inspect.signature(ctx.registered["solve_arc_agi_1"]).parameters) == [
+        "input_grid",
+        "puzzle_id",
+        "few_shot",
+    ]
+    # The evolution count is an argument, not punctuation in the pattern.
+    assert list(inspect.signature(ctx.registered["solve_game_of_life"]).parameters) == [
+        "input_pattern",
+        "evolutions",
+    ]
+
+
+@respx.mock
+def test_starm_solver_posts_to_its_own_port():
+    route = respx.post("http://localhost:8081/generate").mock(
+        return_value=httpx.Response(
+            200, json={"output": "534678912", "steps": 12, "max_steps": 16}
+        )
+    )
+    out = asyncio.run(_solvers().registered["solve_sudoku"]("53..."))
+    assert "534678912" in out
+    assert "12/16" in out  # the ACT step count is carried through
+    assert json.loads(route.calls[0].request.content) == {
+        "task": "sudoku",
+        "input": "53...",
+    }
+
+
+@respx.mock
+def test_starm_solvers_do_not_share_a_port():
+    """Each task has its own server; the tool name picks it."""
+    respx.post("http://localhost:8082/generate").mock(
+        return_value=httpx.Response(
+            200, json={"output": "bob$bob$bob", "steps": 2, "max_steps": 8}
+        )
+    )
+    out = asyncio.run(_solvers().registered["solve_game_of_life"]("bbb$ooo$bbb", 1))
+    assert "bob$bob$bob" in out
+
+
+@respx.mock
+def test_game_of_life_joins_the_pattern_and_the_step_count():
+    """`evolutions` is its own argument because planners forget a '|N'
+    suffix; the tool is what builds the string the server parses."""
+    route = respx.post("http://localhost:8082/generate").mock(
+        return_value=httpx.Response(200, json={"output": "bob$bob$bob"})
+    )
+    gol = _solvers().registered["solve_game_of_life"]
+    asyncio.run(gol("bbb$ooo$bbb", 1))
+    assert json.loads(route.calls[0].request.content)["input"] == "bbb$ooo$bbb|1"
+    # Planners routinely pass numbers as strings.
+    asyncio.run(gol("bbb$ooo$bbb", "3"))
+    assert json.loads(route.calls[1].request.content)["input"] == "bbb$ooo$bbb|3"
+
+
+@respx.mock(assert_all_called=False)
+def test_game_of_life_rejects_an_unusable_evolution_count(respx_mock):
+    gol = _solvers().registered["solve_game_of_life"]
+    assert "whole number" in asyncio.run(gol("bbb$ooo$bbb", "once"))
+    assert "cannot be negative" in asyncio.run(gol("bbb$ooo$bbb", -1))
+    assert not respx_mock.calls  # neither reaches the server
+
+
+# --- solve_arc: puzzle_id / few_shot ---------------------------------------
+
+_PAIR_A = {"input": [[0, 1], [1, 0]], "output": [[1, 0], [0, 1]]}
+_PAIR_B = {"input": [[2, 2], [0, 0]], "output": [[0, 0], [2, 2]]}
+_PAIR_C = {"input": [[5]], "output": [[6]]}
+
+
+#: The shape of the hand-written package data, in miniature.
+from care.runtime.arc_index import ARC_AGI_1_INDEX as _ARC1
+
+_ARC_INDEX_FILE = [
+    {"puzzle_id": "007bbfb7", "few_shot": [_PAIR_A, _PAIR_B]},
+    {"puzzle_id": "beefbeef", "few-shot": [_PAIR_C]},  # `few-shot` is read too
+]
+
+
+@pytest.fixture
+def arc_index(monkeypatch):
+    """Load the fixture file through the real parser, then serve it for
+    whichever dataset index is asked for."""
+    from care.runtime import arc_index as module
+
+    table = module._build_table(_ARC_INDEX_FILE)
+    monkeypatch.setattr(module, "_index", lambda filename: table)
+    return module
+
+
+def test_arc_index_holds_one_entry_of_hashes_per_task(arc_index):
+    """One task, one entry — carrying the hash of each of its
+    demonstrations."""
+    table = arc_index._build_table(_ARC_INDEX_FILE)
+    assert len(table) == len(_ARC_INDEX_FILE)
+    assert table["007bbfb7"] == frozenset(
+        {arc_index.pair_hash(_PAIR_A), arc_index.pair_hash(_PAIR_B)}
+    )
+
+
+def test_arc_index_reads_the_accepted_file_shapes(arc_index):
+    module = arc_index
+    plain = module._build_table(_ARC_INDEX_FILE)
+    assert module._build_table({"tasks": _ARC_INDEX_FILE}) == plain
+    assert module._build_table({"007bbfb7": [_PAIR_A]}) == {
+        "007bbfb7": frozenset({module.pair_hash(_PAIR_A)})
+    }
+    # An entry without an id, or without pairs, is skipped rather than fatal.
+    assert module._build_table([{"puzzle_id": "", "few_shot": [_PAIR_B]}]) == {}
+    assert module._build_table([{"puzzle_id": "x"}]) == {}
+
+
+def test_arc_pair_hash_is_stable_across_a_json_round_trip(arc_index):
+    """The file is hashed on load, the call arguments at call time — both
+    must land on the same digest."""
+    assert arc_index.pair_hash(_PAIR_A) == arc_index.pair_hash(
+        json.loads(json.dumps(_PAIR_A))
+    )
+    assert arc_index.pair_hash({"input": "not a grid"}) == ""
+
+
+def test_arc_lookup_ignores_the_order_of_the_demonstrations(arc_index):
+    assert arc_index.lookup_puzzle_id([_PAIR_A, _PAIR_B], _ARC1) == "007bbfb7"
+    assert arc_index.lookup_puzzle_id([_PAIR_B, _PAIR_A], _ARC1) == "007bbfb7"
+    assert arc_index.lookup_puzzle_id([_PAIR_C], _ARC1) == "beefbeef"
+
+
+def test_arc_lookup_needs_all_of_the_demonstrations(arc_index):
+    """Naming a task from part of its evidence would pick an embedding on a
+    guess, so the set has to be complete."""
+    assert arc_index.lookup_puzzle_id([_PAIR_A], _ARC1) == ""  # 007bbfb7 has two
+    assert arc_index.lookup_puzzle_id([_PAIR_B], _ARC1) == ""
+
+
+def test_arc_lookup_returns_empty_when_a_pair_does_not_belong(arc_index):
+    unknown = {"input": [[7]], "output": [[7]]}
+    # An extra demonstration the task does not have rules it out.
+    assert arc_index.lookup_puzzle_id([_PAIR_A, _PAIR_B, unknown], _ARC1) == ""
+    # Pairs from two different tasks belong to neither.
+    assert arc_index.lookup_puzzle_id([_PAIR_A, _PAIR_C], _ARC1) == ""
+    assert arc_index.lookup_puzzle_id([unknown], _ARC1) == ""
+    assert arc_index.lookup_puzzle_id([], _ARC1) == ""
+    assert arc_index.lookup_puzzle_id("not pairs") == ""
+
+
+def test_parse_arc_few_shot_accepts_the_shapes_planners_send():
+    parse = builtin_tools._parse_arc_few_shot
+    assert parse(json.dumps([_PAIR_A, _PAIR_B])) is not None      # JSON string
+    assert parse([_PAIR_A]) is not None                            # real list
+    assert len(parse({"train": [_PAIR_A, _PAIR_B], "test": []})) == 2  # ARC task
+    assert parse("not json") is None
+    assert parse("") is None
+
+
+@respx.mock
+def test_arc_resolves_the_puzzle_id_from_few_shot(arc_index):
+    route = respx.post("http://localhost:8083/generate").mock(
+        return_value=httpx.Response(200, json={"output": "0 1"})
+    )
+    out = asyncio.run(
+        _solvers().registered["solve_arc_agi_1"](
+            "000<eos>010", few_shot=json.dumps([_PAIR_A, _PAIR_B])
+        )
+    )
+    assert "0 1" in out
+    assert json.loads(route.calls[0].request.content)["puzzle_id"] == "007bbfb7"
+
+
+@respx.mock
+def test_arc_prefers_an_explicit_puzzle_id_and_says_so(arc_index):
+    """Silently dropping few_shot is how a caller ends up believing the
+    demonstrations were used."""
+    route = respx.post("http://localhost:8083/generate").mock(
+        return_value=httpx.Response(200, json={"output": "0 1"})
+    )
+    out = asyncio.run(
+        _solvers().registered["solve_arc_agi_1"](
+            "000<eos>010", puzzle_id="beefbeef", few_shot=json.dumps([_PAIR_A, _PAIR_B])
+        )
+    )
+    assert json.loads(route.calls[0].request.content)["puzzle_id"] == "beefbeef"
+    assert "ignoring few_shot" in out
+    assert "0 1" in out  # the warning rides along with the answer
+
+
+@respx.mock(assert_all_called=False)
+def test_arc_without_either_argument_costs_no_request(respx_mock, arc_index):
+    out = asyncio.run(_solvers().registered["solve_arc_agi_1"]("000<eos>010"))
+    assert "either `puzzle_id`" in out
+    assert not respx_mock.calls
+
+
+@respx.mock(assert_all_called=False)
+def test_arc_unrecognised_few_shot_costs_no_request(respx_mock, arc_index):
+    """No embedding exists for a task outside the training set, so there is
+    nothing to ask the server."""
+    out = asyncio.run(
+        _solvers().registered["solve_arc_agi_1"](
+            "000<eos>010", few_shot=json.dumps([{"input": [[7]], "output": [[7]]}])
+        )
+    )
+    assert "no task the" in out
+    assert not respx_mock.calls
+
+
+@respx.mock(assert_all_called=False)
+def test_arc_unreadable_few_shot_names_the_expected_shape(respx_mock, arc_index):
+    out = asyncio.run(
+        _solvers().registered["solve_arc_agi_1"]("000<eos>010", few_shot="not json")
+    )
+    assert "could not read" in out
+    assert not respx_mock.calls
+
+
+@pytest.mark.parametrize("index", ["ARC_AGI_1_INDEX", "ARC_AGI_2_INDEX"])
+def test_bundled_arc_index_is_well_formed(index):
+    """Guards the hand-written package data, once it exists."""
+    from care.runtime import arc_index as module
+
+    filename = getattr(module, index)
+
+    module._index.cache_clear()
+    table = module._index(filename)
+    if not table:
+        pytest.skip(f"{filename} not written yet")
+    for puzzle_id, digests in table.items():
+        assert puzzle_id and digests
+        for digest in digests:
+            assert len(digest) == 64
+            assert all(c in "0123456789abcdef" for c in digest)
+
+
+@respx.mock
+def test_arc_forwards_the_puzzle_id():
+    route = respx.post("http://localhost:8083/generate").mock(
+        return_value=httpx.Response(200, json={"output": "0 1", "steps": 1, "max_steps": 4})
+    )
+    asyncio.run(_solvers().registered["solve_arc_agi_1"]("0 0", "007bbfb7"))
+    assert json.loads(route.calls[0].request.content)["puzzle_id"] == "007bbfb7"
+
+
+@respx.mock(assert_all_called=False)
+def test_starm_solver_empty_problem_costs_no_request(respx_mock):
+    out = asyncio.run(_solvers().registered["solve_sudoku"]("   "))
+    assert "`input_grid`" in out  # the message names this tool's own argument
+    assert not respx_mock.calls
+
+
+@respx.mock
+def test_starm_solver_unreachable_server_is_graceful():
+    respx.post("http://localhost:8081/generate").mock(
+        side_effect=httpx.ConnectError("connection refused")
+    )
+    out = asyncio.run(_solvers().registered["solve_sudoku"]("53..."))
+    assert "solve_sudoku error" in out
+    assert "Is a STARM server running" in out
+
+
+@respx.mock
+def test_starm_solver_relays_the_servers_rejection():
+    """STARM owns the prompt format, so its 422 text is the answer."""
+    respx.post("http://localhost:8081/generate").mock(
+        return_value=httpx.Response(422, json={"detail": "81 cells expected, got 12"})
+    )
+    out = asyncio.run(_solvers().registered["solve_sudoku"]("53"))
+    assert "81 cells expected, got 12" in out
+
+
+@respx.mock
+def test_starm_solver_empty_answer_is_reported():
+    respx.post("http://localhost:8081/generate").mock(
+        return_value=httpx.Response(200, json={"output": "  "})
+    )
+    out = asyncio.run(_solvers().registered["solve_sudoku"]("x"))
+    assert "empty answer" in out
+
+
+@respx.mock
+def test_starm_solver_honours_a_remote_host():
+    cfg = _StarmCfg()
+    cfg.starm_host = "http://gpu-01"
+    respx.post("http://gpu-01:8081/generate").mock(
+        return_value=httpx.Response(200, json={"output": "ok", "steps": 1, "max_steps": 2})
+    )
+    assert "ok" in asyncio.run(_solvers(cfg).registered["solve_sudoku"]("x"))
+
+
+def test_starm_base_url_composition():
+    assert builtin_tools._starm_base_url("http://gpu-01", 8081) == "http://gpu-01:8081"
+    assert builtin_tools._starm_base_url("gpu-01", 8080) == "http://gpu-01:8080"
+    # A port on the host loses to the task's own.
+    assert builtin_tools._starm_base_url("http://localhost:9000", 8081) == (
+        "http://localhost:8081"
+    )
+
+
+def test_starm_solver_ports_drops_unusable_entries():
+    class _Cfg:
+        starm_ports = {
+            "sudoku": 8081,
+            "chess": 9000,  # not a STARM task
+            "maze": "nope",  # not a port
+            "Game-Of-Life": 8082,  # spelling folded
+        }
+
+    assert builtin_tools.starm_solver_ports(_Cfg()) == {
+        "sudoku": 8081,
+        "game_of_life": 8082,
+    }
+
+
+def test_starm_ports_parse_from_an_env_style_string():
+    cfg = CareConfig(tools={"starm_ports": "sudoku=8080, maze=8081"})
+    assert cfg.tools.starm_ports == {"sudoku": 8080, "maze": 8081}
+
+
+def test_starm_ports_parse_from_json():
+    cfg = CareConfig(tools={"starm_ports": '{"arc_agi_1": 8083}'})
+    assert cfg.tools.starm_ports == {"arc_agi_1": 8083}
+
+
+def test_starm_ports_empty_by_default():
+    assert CareConfig().tools.starm_ports == {}
+
+
+def test_starm_specs_are_advertised_per_task():
+    by_name = {s["name"]: s for s in builtin_tools.builtin_tool_specs(_StarmCfg())}
+    assert {"solve_sudoku", "solve_game_of_life", "solve_arc_agi_1"} <= set(by_name)
+    sudoku = by_name["solve_sudoku"]["description"]
+    assert sudoku.startswith("solve_sudoku(input_grid: str) -> str.")
+    assert "task_id" not in sudoku  # the solver is chosen by tool name
+    arc = by_name["solve_arc_agi_1"]["description"]
+    assert "puzzle_id" in arc
+    # Rows go in separated by '<eos>', and the example shows exactly that.
+    assert "'000<eos>010<eos>000'" in arc
+
+
+def test_every_starm_spec_matches_its_solver():
+    """The hand-written specs and the registered callables must agree:
+    one spec per task, same name, and a signature the description documents."""
+
+    class _AllTasks:
+        starm_host = "http://localhost"
+        starm_timeout = 5.0
+        enable_code_exec = False
+        starm_ports = {
+            task: 8000 + i
+            for i, task in enumerate(builtin_tools._STARM_TASKS)
+        }
+
+    cfg = _AllTasks()
+    ctx = _StubCtx()
+    builtin_tools.register_builtin_tools(ctx, cfg, CareConfig().sandbox)
+    specs = {s["name"]: s for s in builtin_tools.builtin_tool_specs(cfg)}
+
+    for task in builtin_tools._STARM_TASKS:
+        name = f"solve_{task_id}"
+        assert name in ctx.registered, name
+        assert name in specs, name
+        params = list(inspect.signature(ctx.registered[name]).parameters)
+        head = specs[name]["description"].split(" -> str.")[0]
+        assert head.startswith(f"{name}("), name
+        for param in params:  # every argument is documented in the signature
+            assert param in head, (name, param)
+        assert specs[name]["source"] == "care:builtin"
+        assert specs[name]["tags"]
+
+
+def test_starm_specs_never_mention_the_engine():
+    """The planner picks a tool by what it does; the backend is CARE's
+    business, and naming it only spends context."""
+    for spec in builtin_tools.builtin_tool_specs(_StarmCfg()):
+        if spec["name"].startswith("solve_"):
+            assert "starm" not in spec["description"].lower(), spec["name"]
+
+
+def test_starm_specs_document_the_problem_format():
+    """Each solver states its own encoding — that's what stops a planner
+    passing the user's sentence through."""
+    by_name = {s["name"]: s for s in builtin_tools.builtin_tool_specs(_StarmCfg())}
+    assert "81 cells" in by_name["solve_sudoku"]["description"]
+    assert "'#' a wall" in by_name["solve_maze"]["description"]
+    arithmetic = by_name["solve_arithmetic"]["description"]
+    # Postfix, per the dataset builder's evaluate_rpn — the example must parse
+    # that way, unlike the infix one in STARM's own input_help.
+    assert "REVERSE POLISH" in arithmetic
+    assert "'34?5?=35'" in arithmetic
+    # The notation is unfolded step by step: postfix is not a format a
+    # planner can be assumed to read off the name alone.
+    assert "'34+5*' unfolds as (3+4)=7, then 7*5=35" in arithmetic
+    gol = by_name["solve_game_of_life"]["description"]
+    assert "'bbb$ooo$bbb'" in gol  # the pattern; the tool adds the count
+    assert "`input_pattern`: the starting pattern" in gol
+    assert "`evolutions`: after how many evolutions" in gol
+
+
+def test_every_starm_spec_carries_an_example():
+    """A format described in prose still gets guessed at; a worked example
+    is what a planner copies."""
+    class _AllTasks:
+        starm_host = "http://localhost"
+        starm_timeout = 5.0
+        starm_ports = {
+            task: 8000 + i
+            for i, task in enumerate(builtin_tools._STARM_TASKS)
+        }
+
+    for spec in builtin_tools.builtin_tool_specs(_AllTasks()):
+        if spec["name"].startswith("solve_"):
+            assert "Example" in spec["description"], spec["name"]
+
+
+def test_starm_specs_absent_without_configured_servers():
+    names = {s["name"] for s in builtin_tools.builtin_tool_specs()}
+    assert not [n for n in names if n.startswith("solve_")]
 
 
 # ---------------------------------------------------------------------------
