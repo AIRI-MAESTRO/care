@@ -30,7 +30,7 @@ jobs:
 
   mirror:
     needs: ci
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-latest'] || 'ubuntu-latest' }}
     steps:
       - name: Checkout release tree
         uses: actions/checkout@v5

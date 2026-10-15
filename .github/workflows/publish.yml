@@ -14,7 +14,7 @@ permissions:
 jobs:
   build:
     name: Build distribution
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-latest'] || 'ubuntu-latest' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -38,7 +38,7 @@ jobs:
   publish:
     name: Publish to PyPI (Trusted Publishing)
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-latest'] || 'ubuntu-latest' }}
     # Gates the publish on the `pypi` environment so a maintainer can
     # require manual approval + scope the OIDC trusted publisher.
     environment:
