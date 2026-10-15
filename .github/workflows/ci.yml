@@ -15,7 +15,7 @@ permissions:
 jobs:
   lint-and-test:
     name: Lint + tests (py${{ matrix.python }})
-    runs-on: ${{ fromJSON(vars.CI_RUNNERS || '{}')['ubuntu-latest'] || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
